@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'business_data.dart';
 import 'business_repository.dart';
 import 'business_settings_router.dart';
+import '../services/security/secret_protection.dart';
 
 typedef _SyntheticEntityIdentity = ({
   String rowId,
@@ -17,7 +18,9 @@ typedef _SyntheticEntityIdentity = ({
 /// snapshot. Writes are serialized and update the in-memory view only after the
 /// repository operation succeeds.
 final class BusinessPreferences {
-  BusinessPreferences(this._repository);
+  BusinessPreferences(this._repository, {SecretProtection? secrets})
+    : _secrets = secrets;
+  final SecretProtection? _secrets;
 
   static const _providersOrderKey = 'providers_order_v1';
 
@@ -44,7 +47,24 @@ final class BusinessPreferences {
 
   Future<void> _loadFromRepository() async {
     try {
-      final snapshot = await _repository.readSnapshot();
+      var snapshot = await _repository.readSnapshot();
+      final secrets = _secrets;
+      if (secrets != null) {
+        final protected = await secrets.snapshot(snapshot);
+        // Startup has no exposed providers or concurrent writes yet.
+        final changed =
+            jsonEncode(snapshot.preferences) !=
+                jsonEncode(protected.preferences) ||
+            snapshot.entities.entries.any((entry) {
+              final secured = protected.entities[entry.key]!;
+              return entry.value.indexed.any(
+                (item) => item.$2.payload != secured[item.$1].payload,
+              );
+            });
+        if (changed) await _repository.transformSnapshot((_) => protected);
+        snapshot = await secrets.snapshot(protected, hydrate: true);
+        await secrets.collectGarbage(protected);
+      }
       _applyRuntimeSnapshot(snapshot);
       _isLoaded = true;
     } finally {
@@ -111,13 +131,18 @@ final class BusinessPreferences {
       if (kind != null) {
         final next = Map<String, Object>.from(_values)..remove(key);
         final routed = BusinessSettingsRouter.normalizeAndRoute(next);
-        await _repository.synchronizeEntities(kind, routed.entities[kind]!);
+        final rows = routed.entities[kind]!;
+        await _repository.synchronizeEntities(
+          kind,
+          await _secrets?.entities(rows) ?? rows,
+        );
         _applyRuntimeEntity(kind, routed);
       } else {
         _validatePreferenceKey(key);
         await _repository.removePreference(key);
         _values.remove(key);
       }
+      await _cleanupSecrets();
       return true;
     });
   }
@@ -143,13 +168,21 @@ final class BusinessPreferences {
             preferences: routed.preferences,
           );
         }
-        await _repository.synchronizeEntities(kind, routed.entities[kind]!);
+        final rows = routed.entities[kind]!;
+        await _repository.synchronizeEntities(
+          kind,
+          await _secrets?.entities(rows) ?? rows,
+        );
         _applyRuntimeEntity(kind, routed);
       } else {
         _validatePreferenceKey(key);
-        await _repository.setPreference(key, value);
+        await _repository.setPreference(
+          key,
+          await _secrets?.preference(key, value) ?? value,
+        );
         _values[key] = _copyForStorage(value);
       }
+      await _cleanupSecrets();
       return true;
     });
   }
@@ -164,6 +197,15 @@ final class BusinessPreferences {
       onError: (Object _, StackTrace __) {},
     );
     return result;
+  }
+
+  Future<void> _cleanupSecrets() async {
+    if (_secrets == null) return;
+    // The database commit succeeded. Cleanup may be retried at next startup;
+    // never report a committed save as failed because orphan cleanup failed.
+    try {
+      await _secrets.collectGarbage(await _repository.readSnapshot());
+    } catch (_) {}
   }
 
   BusinessEntityKind? _entityKindForKey(String key) {

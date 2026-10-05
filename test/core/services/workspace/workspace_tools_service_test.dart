@@ -880,31 +880,28 @@ void main() {
       },
     );
 
-    test(
-      'native outside write forces approval regardless of allowAll',
-      () async {
-        final approval = _RecordingApproval()..allow = false;
-        final outside = p.join(
-          Directory.current.path,
-          'kelivo_ws_outside_test.txt',
-        );
-        addTearDown(() {
-          final file = File(outside);
-          if (file.existsSync()) file.deleteSync();
-        });
-        final result = await service().handle(
-          ctx(allowAll: true),
-          'write_file',
-          {'path': outside, 'content': 'nope'},
-          toolCallId: 'appr-out',
-          approvalService: approval,
-        );
-        expect(approval.calls, 1);
-        expect(jsonOf(result)['error'], 'approval_denied');
-        expect(jsonOf(result)['message'], 'nope');
-        expect(File(outside).existsSync(), isFalse);
-      },
-    );
+    test('native outside write requires approval in request mode', () async {
+      final approval = _RecordingApproval()..allow = false;
+      final outside = p.join(
+        Directory.current.path,
+        'kelivo_ws_outside_test.txt',
+      );
+      addTearDown(() {
+        final file = File(outside);
+        if (file.existsSync()) file.deleteSync();
+      });
+      final result = await service().handle(
+        ctx(allowAll: false),
+        'write_file',
+        {'path': outside, 'content': 'nope'},
+        toolCallId: 'appr-out',
+        approvalService: approval,
+      );
+      expect(approval.calls, 1);
+      expect(jsonOf(result)['error'], 'approval_denied');
+      expect(jsonOf(result)['message'], 'nope');
+      expect(File(outside).existsSync(), isFalse);
+    });
   });
 
   test(

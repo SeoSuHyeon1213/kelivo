@@ -104,6 +104,31 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Search settings'**
+  String get securityPermissionsTitle;
+  String get securityModeRequest;
+  String get securityModeAuto;
+  String get securityModeFull;
+  String get securityModeRequestHint;
+  String get securityModeAutoHint;
+  String get securityModeFullHint;
+  String get securityIndependentLimits;
+  String get securityRulesTitle;
+  String get securityRulesHint;
+  String get securityRuleRead;
+  String get securityRuleWrite;
+  String get securityRuleShell;
+  String get securityRuleDeny;
+  String get securityRuleAllow;
+  String get securityRuleAction;
+  String get securityRuleEffect;
+  String get securityRulePath;
+  String get securityRuleCommand;
+  String get securityRuleRecursive;
+  String get securityRuleAdd;
+  String get securityRuleRemove;
+  String get securityRuleInvalid;
+  String get securitySaveFailed;
+
   String get settingsSearchHint;
 
   /// No description provided for @settingsSearchCancel.

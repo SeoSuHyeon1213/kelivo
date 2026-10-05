@@ -179,18 +179,21 @@ void main() {
       expect(paths.normalizeCwd('$climb/etc'), p.canonicalize(workspace.path));
     });
 
-    test('rejects .. that leaves workspace even when landing in tmp', () {
-      expect(paths.tmpHostRoot, p.canonicalize(Directory.systemTemp.path));
-      expect(
-        p.isWithin(paths.tmpHostRoot, paths.workspaceHostRoot) ||
-            p.equals(paths.tmpHostRoot, paths.workspaceHostRoot),
-        isTrue,
-      );
-      expect(
-        () => paths.resolve('../x.txt', cwd: workspace.path),
-        throwsA(isA<PathResolutionException>()),
-      );
-    });
+    test(
+      'scratch is private to the session and .. cannot escape workspace',
+      () {
+        expect(paths.tmpHostRoot, p.canonicalize(p.join(session.path, 'tmp')));
+        expect(
+          p.isWithin(paths.tmpHostRoot, paths.workspaceHostRoot) ||
+              p.equals(paths.tmpHostRoot, paths.workspaceHostRoot),
+          isFalse,
+        );
+        expect(
+          () => paths.resolve('../x.txt', cwd: workspace.path),
+          throwsA(isA<PathResolutionException>()),
+        );
+      },
+    );
 
     test('allows .. that stays inside the workspace zone', () {
       final resolved = paths.resolve('sub/../file.txt', cwd: workspace.path);

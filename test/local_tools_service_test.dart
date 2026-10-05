@@ -220,6 +220,7 @@ void main() {
           LocalToolNames.clipboard,
           const {'action': 'read'},
           localToolsAssistant,
+          authorizeClipboard: () async => true,
         );
 
         expect(result, isNotNull);
@@ -245,6 +246,7 @@ void main() {
         LocalToolNames.clipboard,
         const {'action': 'write', 'text': 'next clipboard'},
         localToolsAssistant,
+        authorizeClipboard: () async => true,
       );
 
       expect(writtenText, 'next clipboard');
@@ -255,12 +257,41 @@ void main() {
       });
     });
 
+    test('clipboard stays untouched without approval or when denied', () async {
+      var platformCalls = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            platformCalls++;
+            return null;
+          });
+      for (final args in [
+        const {'action': 'read'},
+        const {'action': 'write', 'text': 'secret'},
+      ]) {
+        final missing = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.clipboard,
+          args,
+          localToolsAssistant,
+        );
+        final denied = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.clipboard,
+          args,
+          localToolsAssistant,
+          authorizeClipboard: () async => false,
+        );
+        expect(jsonDecode(missing!)['error'], 'approval_required');
+        expect(jsonDecode(denied!)['error'], 'approval_required');
+      }
+      expect(platformCalls, 0);
+    });
+
     test('clipboard write requires text', () async {
       expect(
         () => LocalToolsService.tryHandleToolCall(
           LocalToolNames.clipboard,
           const {'action': 'write'},
           localToolsAssistant,
+          authorizeClipboard: () async => true,
         ),
         throwsA(isA<ArgumentError>()),
       );

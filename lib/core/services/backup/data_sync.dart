@@ -2515,7 +2515,10 @@ class DataSync {
         (entry as Map).cast<String, dynamic>(),
       );
       return conversation.copyWith(
-        extras: {...conversation.extras}..remove('workspace.allowAll'),
+        extras: {...conversation.extras}
+          ..remove('workspace.allowAll')
+          ..remove('workspace.permissionMode')
+          ..remove('workspace.permissionRules'),
       );
     }).toList();
 

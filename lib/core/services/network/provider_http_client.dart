@@ -12,7 +12,7 @@ http.Client providerHttpClient(
 }) {
   final host = (config.proxyHost ?? '').trim();
   final port = (config.proxyPort ?? '').trim();
-  if (config.proxyEnabled == true && host.isNotEmpty && port.isNotEmpty) {
+  if (config.proxyEnabled == true) {
     final user = (config.proxyUsername ?? '').trim();
     final pass = (config.proxyPassword ?? '').trim();
     return DioHttpClient(
@@ -20,7 +20,7 @@ http.Client providerHttpClient(
         enabled: true,
         type: ProviderConfig.resolveProxyType(config.proxyType),
         host: host,
-        port: int.tryParse(port) ?? 8080,
+        port: int.tryParse(port) ?? 0,
         username: user.isEmpty ? null : user,
         password: pass.isEmpty ? null : pass,
       ),

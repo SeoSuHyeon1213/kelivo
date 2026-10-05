@@ -11,6 +11,15 @@ import 'workspace_runtime.dart';
 ///
 /// Commands run as a fresh shell process (not a sandbox). Mounts are ignored.
 class DesktopProcessRuntime extends WorkspaceRuntime {
+  DesktopProcessRuntime({String? windowsLauncherPath})
+    : _windowsLauncherPath =
+          windowsLauncherPath ??
+          p.join(
+            p.dirname(Platform.resolvedExecutable),
+            'kelivo_process_launcher.exe',
+          );
+
+  final String _windowsLauncherPath;
   final Map<String, _LiveRun> _live = <String, _LiveRun>{};
   final Set<String> _starting = <String>{};
   final Set<String> _pendingCancel = <String>{};
@@ -26,6 +35,14 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
 
   @override
   Future<RuntimeStatus> status() async {
+    if (Platform.isWindows && !File(_windowsLauncherPath).existsSync()) {
+      return const RuntimeStatus(
+        ready: false,
+        reason: 'Bundled Windows process launcher is missing',
+        engine: 'process',
+        sandboxed: false,
+      );
+    }
     final shell = await _shell();
     if (shell == null) {
       return const RuntimeStatus(
@@ -225,10 +242,11 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
         unawaited(_killTree(live));
       });
 
-      if (live.processGroup != null && !live.cancelled) {
+      if ((live.processGroup != null || Platform.isWindows) &&
+          !live.cancelled) {
         // The launcher waits until its group is registered before running any
         // user code, so a cancellation during startup cannot lose its children.
-        process.stdin.writeln();
+        process.stdin.write('\n');
         await process.stdin.flush();
       }
 
@@ -270,7 +288,7 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
   _startProcess(_ShellSpec spec, CommandRequest request) async {
     final unix = Platform.isMacOS || Platform.isLinux;
     final process = await Process.start(
-      unix ? '/bin/bash' : spec.executable,
+      unix ? '/bin/bash' : _windowsLauncherPath,
       unix
           ? [
               '--noprofile',
@@ -282,7 +300,7 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
               spec.executable,
               ...spec.arguments(request.command),
             ]
-          : spec.arguments(request.command),
+          : [spec.executable, ...spec.arguments(request.command)],
       workingDirectory: request.cwd,
       environment: <String, String>{...Platform.environment, ...request.env},
       includeParentEnvironment: false,
@@ -372,15 +390,10 @@ wait "$!" 2>/dev/null
         await _killUnixGroup(group);
         return;
       }
-      // Windows taskkill identifies its tree by the still-live parent PID.
-      if (live.processExited) return;
-      final pid = live.process.pid;
       if (Platform.isWindows) {
-        try {
-          await Process.run('taskkill', ['/T', '/F', '/PID', '$pid']);
-        } catch (_) {
-          live.process.kill();
-        }
+        // The supervisor's job owns its children, even if the shell already
+        // exited. Killing it closes the job instead of guessing descendant PIDs.
+        live.process.kill();
         return;
       }
     } finally {

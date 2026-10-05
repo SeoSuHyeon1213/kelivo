@@ -111,10 +111,11 @@ class GrepResult {
 }
 
 class HostFileTools {
-  HostFileTools(this.paths, {this.checkCancelled});
+  HostFileTools(this.paths, {this.checkCancelled, this.checkPath});
 
   final WorkspacePaths paths;
   final void Function()? checkCancelled;
+  final Future<void> Function(ResolvedPath path)? checkPath;
 
   static const int readCapBytes = 32 * 1024;
   static const int binaryProbeBytes = 8 * 1024;
@@ -258,6 +259,7 @@ class HostFileTools {
     checkCancelled?.call();
     await file.parent.create(recursive: true);
     checkCancelled?.call();
+    await _resolve(path, cwd);
     await file.writeAsString(content);
     return WriteFileResult(
       bytes: utf8.encode(content).length,
@@ -292,6 +294,7 @@ class HostFileTools {
     }
     final applied = outcome as EditApplied;
     checkCancelled?.call();
+    await _resolve(path, cwd);
     await file.writeAsString(applied.updated);
     return EditFileResult(
       changed: original != applied.updated,
@@ -401,6 +404,7 @@ class HostFileTools {
     var truncated = false;
 
     Future<bool> scanFile(File file) async {
+      await _resolve(paths.toModelPath(file.path), cwd);
       final stat = await file.stat();
       if (stat.size > maxFileBytes) return false;
       final bytes = await file.readAsBytes();
@@ -443,7 +447,16 @@ class HostFileTools {
 
   Future<ResolvedPath> _resolve(String path, String? cwd) async {
     await paths.refreshExternalMounts();
-    return paths.resolveReal(path, cwd: paths.normalizeCwd(cwd));
+    final resolved = await paths.resolveReal(
+      path,
+      cwd: paths.normalizeCwd(cwd),
+    );
+    if (paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
+      throw const PathResolutionException('Path is outside sandbox zones');
+    }
+    checkCancelled?.call();
+    await checkPath?.call(resolved);
+    return resolved;
   }
 
   Future<bool> _walkDir(
@@ -451,6 +464,7 @@ class HostFileTools {
     int remainingDepth,
     List<ListDirEntry> out,
   ) async {
+    await _resolve(paths.toModelPath(dir.path), paths.modelRoot);
     final entities = await dir.list(followLinks: false).toList();
     entities.sort((a, b) {
       final aDir = a is Directory;
@@ -466,6 +480,7 @@ class HostFileTools {
       if (out.length >= listCap) return true;
       final name = p.basename(entity.path);
       if (_isL2s(name)) continue;
+      await _resolve(paths.toModelPath(entity.path), paths.modelRoot);
       final stat = await entity.stat();
       final isDir = stat.type == FileSystemEntityType.directory;
       out.add(
@@ -493,8 +508,10 @@ class HostFileTools {
     final stack = <Directory>[root];
     while (stack.isNotEmpty) {
       final dir = stack.removeLast();
+      await _resolve(paths.toModelPath(dir.path), paths.modelRoot);
       final children = await dir.list(followLinks: false).toList();
       for (final entity in children) {
+        await _resolve(paths.toModelPath(entity.path), paths.modelRoot);
         final name = p.basename(entity.path);
         if (entity is Directory) {
           if (skipDotDirs && name.startsWith('.')) continue;

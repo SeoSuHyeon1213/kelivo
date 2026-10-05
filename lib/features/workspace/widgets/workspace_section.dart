@@ -27,12 +27,12 @@ import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
-import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../pages/workspace_permissions_page.dart';
 import 'desktop_workspace_button.dart';
 import 'workspace_default_notice.dart';
 
@@ -60,8 +60,8 @@ class WorkspaceSection extends StatefulWidget {
   static const Key cwdErrorKey = ValueKey<String>(
     'workspace-section-cwd-error',
   );
-  static const Key allowAllKey = ValueKey<String>(
-    'workspace-section-allow-all',
+  static const Key permissionsKey = ValueKey<String>(
+    'workspace-section-permissions',
   );
   static const Key nameKey = ValueKey<String>('workspace-section-name');
   static const Key filesKey = ValueKey<String>('workspace-section-files');
@@ -220,19 +220,8 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         workspaceId: workspace.id,
         cwd: picked,
         toolsUsed: binding.toolsUsed,
-        allowAll: binding.allowAll,
-      ),
-    );
-  }
-
-  Future<void> _setAllowAll(WorkspaceBinding binding, bool value) async {
-    if (!binding.isBound) return;
-    await _writeBinding(
-      WorkspaceBinding(
-        workspaceId: binding.workspaceId,
-        cwd: binding.cwd,
-        toolsUsed: binding.toolsUsed,
-        allowAll: value,
+        permissionMode: binding.permissionMode,
+        permissionRules: binding.permissionRules,
       ),
     );
   }
@@ -392,7 +381,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
           ),
         );
       }
-      rows.add(_allowAllRow(l10n, binding));
+      rows.add(_permissionsRow(l10n, binding));
     }
 
     return Column(
@@ -515,7 +504,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
           onTap: () => _editCwd(workspace, binding),
         ),
         const SizedBox(height: 12),
-        _allowAllRow(l10n, binding),
+        _permissionsRow(l10n, binding),
       ],
     );
   }
@@ -717,17 +706,26 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     }
   }
 
-  Widget _allowAllRow(AppLocalizations l10n, WorkspaceBinding binding) {
+  Widget _permissionsRow(AppLocalizations l10n, WorkspaceBinding binding) {
     return ToolsSheetRow(
+      key: WorkspaceSection.permissionsKey,
       icon: Lucide.Shield,
-      label: l10n.workspaceEntryAllowAll,
-      subtitle: l10n.workspaceEntryAllowAllSubtitle,
-      trailing: IosSwitch(
-        key: WorkspaceSection.allowAllKey,
-        value: binding.allowAll,
-        semanticLabel: l10n.workspaceEntryAllowAll,
-        onChanged: (value) => unawaited(_setAllowAll(binding, value)),
-      ),
+      label: l10n.securityPermissionsTitle,
+      subtitle: permissionModeLabel(l10n, binding.permissionMode),
+      trailing: ToolsSheetRow.chevron(context),
+      onTap: () async {
+        final id = await _ensureConversationId();
+        if (id == null || !mounted) return;
+        _afterClose(
+          (ctx) => unawaited(
+            Navigator.of(ctx).push<void>(
+              MaterialPageRoute(
+                builder: (_) => WorkspacePermissionsPage(conversationId: id),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

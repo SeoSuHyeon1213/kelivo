@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 /// Result of a tool approval request.
@@ -15,6 +16,18 @@ class ToolApprovalResult {
 }
 
 typedef _PendingKey = ({String scope, String toolCallId});
+
+Object? _freezeArguments(Object? value) {
+  if (value is Map)
+    return Map<String, dynamic>.unmodifiable(
+      value.map(
+        (key, item) => MapEntry(key.toString(), _freezeArguments(item)),
+      ),
+    );
+  if (value is List)
+    return List<Object?>.unmodifiable(value.map(_freezeArguments));
+  return value;
+}
 
 /// A pending approval request for an MCP tool call.
 class ToolApprovalRequest {
@@ -107,13 +120,21 @@ class ToolApprovalService extends ChangeNotifier {
     final key = _storageKey(conversationId, toolCallId);
     final existing = _pending[key];
     if (existing != null) {
+      if (existing.toolName != toolName ||
+          jsonEncode(existing.arguments) != jsonEncode(arguments)) {
+        return Future.value(
+          ToolApprovalResult.denied('approval_request_mismatch'),
+        );
+      }
       return existing.future;
     }
     final completer = Completer<ToolApprovalResult>();
     _pending[key] = ToolApprovalRequest(
       toolCallId: toolCallId,
       toolName: toolName,
-      arguments: arguments,
+      arguments:
+          _freezeArguments(jsonDecode(jsonEncode(arguments)))
+              as Map<String, dynamic>,
       conversationId: _storedConversationId(conversationId),
       completer: completer,
     );

@@ -1060,22 +1060,27 @@ class _WorkspacePendingBody extends StatelessWidget {
     final fg = chatSurfaceForegroundPalette(context);
     final approval = maybeRead<ToolApprovalService>(context);
     final preview = part.toolName == 'shell'
-        ? workspaceCommandOf(part, meta: meta, run: run)
-        : workspacePathOf(part, meta: meta);
+        ? (request.arguments['command']?.toString() ??
+              workspaceCommandOf(part, meta: meta, run: run))
+        : (request.arguments['resolved_path']?.toString() ??
+              workspacePathOf(part, meta: meta));
     return Column(
       key: WorkspaceStatusBadge.approvalKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (preview.isNotEmpty)
-          Text(
+          SelectableText(
             preview,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
               fontFamily: workspaceCodeFontFamily(context),
               color: fg.body,
             ),
+          ),
+        if (request.arguments['resolved_cwd'] != null)
+          SelectableText(
+            request.arguments['resolved_cwd'].toString(),
+            style: TextStyle(fontSize: 12, color: fg.body),
           ),
         IosCardPress(
           key: WorkspaceToolCardBody.allowAllKey,
@@ -1093,13 +1098,17 @@ class _WorkspacePendingBody extends StatelessWidget {
                   ),
                 ),
           child: Text(
-            l10n.workspaceToolAllowAll,
+            l10n.securityModeFull,
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: AppFontWeights.medium,
               color: fg.accent,
             ),
           ),
+        ),
+        Text(
+          l10n.securityModeFullHint,
+          style: TextStyle(fontSize: 12, color: fg.body),
         ),
       ],
     );
@@ -1113,6 +1122,7 @@ Future<void> allowAllWorkspaceToolsInChat(
   required String conversationId,
 }) async {
   final chat = maybeRead<ChatService>(context);
+  var updated = false;
   final id = conversationId.isNotEmpty
       ? conversationId
       : (request.conversationId ?? '');
@@ -1123,16 +1133,29 @@ Future<void> allowAllWorkspaceToolsInChat(
         final binding = WorkspaceBinding.fromExtras(conversation.extras);
         if (binding.isBound) {
           await chat.updateConversationExtras(id, (extras) {
+            final current = WorkspaceBinding.fromExtras(extras);
+            if (current.workspaceId != binding.workspaceId || !current.isBound)
+              throw StateError('workspace_permission_changed');
             return WorkspaceBinding(
-              workspaceId: binding.workspaceId,
-              cwd: binding.cwd,
-              toolsUsed: binding.toolsUsed,
+              workspaceId: current.workspaceId,
+              cwd: current.cwd,
+              toolsUsed: current.toolsUsed,
+              permissionRules: current.permissionRules,
               allowAll: true,
             ).applyTo(extras);
           });
+          updated = true;
         }
       }
     } catch (_) {}
+  }
+  if (!updated) {
+    approval.deny(
+      request.toolCallId,
+      conversationId: request.conversationId,
+      reason: 'permission_update_failed',
+    );
+    return;
   }
   approval.approve(request.toolCallId, conversationId: request.conversationId);
 }

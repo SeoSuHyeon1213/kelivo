@@ -29,6 +29,17 @@ void main() {
   group('DesktopProcessRuntime', () {
     test('status reports a ready unsandboxed process engine', () async {
       final status = await runtime.status();
+      if (Platform.isWindows) {
+        final missing = DesktopProcessRuntime(
+          windowsLauncherPath: '${tmp.path}/missing-launcher.exe',
+        );
+        expect((await missing.status()).ready, isFalse);
+        // A Flutter test runner has no application bundle beside its executable.
+        if (!status.ready) {
+          expect(status.reason, contains('process launcher'));
+          return;
+        }
+      }
       expect(status.ready, isTrue);
       expect(status.engine, 'process');
       expect(status.sandboxed, isFalse);

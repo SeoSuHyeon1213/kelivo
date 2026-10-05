@@ -48,6 +48,7 @@ class LocalToolNames {
   ];
 
   static const List<String> requiresUserApproval = [
+    clipboard,
     calendarCreate,
     remindersCreate,
     remindersComplete,
@@ -507,6 +508,7 @@ class LocalToolsService {
     Map<String, dynamic> args,
     Assistant? assistant, {
     TextToSpeechStarter? onSpeakText,
+    Future<bool> Function()? authorizeClipboard,
   }) async {
     if (assistant == null || !assistant.localToolIds.contains(name)) {
       return null;
@@ -515,6 +517,12 @@ class LocalToolsService {
       return jsonEncode(_buildTimeInfoPayload(DateTime.now()));
     }
     if (name == LocalToolNames.clipboard) {
+      if (authorizeClipboard == null || !await authorizeClipboard()) {
+        return jsonEncode({
+          'error': 'approval_required',
+          'message': 'Clipboard access requires explicit user approval.',
+        });
+      }
       return _handleClipboardTool(args);
     }
     if (name == LocalToolNames.textToSpeech) {
@@ -684,7 +692,7 @@ class LocalToolsService {
     'function': {
       'name': LocalToolNames.clipboard,
       'description':
-          'Read or write plain text from the device clipboard. Use action: read or write. For write, provide text. Do NOT write to the clipboard unless the user has explicitly requested it.',
+          'Read or write plain text from the device clipboard. Both actions require explicit user approval, including in full workspace access mode. Use action: read or write. For write, provide text. Do NOT write to the clipboard unless the user has explicitly requested it.',
       'parameters': {
         'type': 'object',
         'properties': {

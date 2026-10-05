@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/models/permission_mode.dart';
 
 void main() {
   group('WorkspaceBinding', () {
@@ -9,7 +10,7 @@ void main() {
         WorkspaceBinding.keyId: 'ws-1',
         WorkspaceBinding.keyCwd: 'lib',
         WorkspaceBinding.keyToolsUsed: true,
-        WorkspaceBinding.keyAllowAll: true,
+        WorkspaceBinding.keyPermissionMode: PermissionMode.fullAccess.name,
         'other.flag': true,
       });
       expect(binding.workspaceId, 'ws-1');
@@ -32,7 +33,11 @@ void main() {
       expect(next[WorkspaceBinding.keyId], 'ws-1');
       expect(next[WorkspaceBinding.keyCwd], 'src');
       expect(next[WorkspaceBinding.keyToolsUsed], isTrue);
-      expect(next[WorkspaceBinding.keyAllowAll], isFalse);
+      expect(
+        next[WorkspaceBinding.keyPermissionMode],
+        PermissionMode.requestApproval.name,
+      );
+      expect(next.containsKey(WorkspaceBinding.keyAllowAll), isFalse);
       expect(next['other.flag'], isTrue);
     });
 
@@ -70,6 +75,34 @@ void main() {
       );
       expect(WorkspaceBinding.extrasHaveWorkspace(const {}, exists), isFalse);
       expect(WorkspaceBinding.extrasHaveWorkspace(null, exists), isFalse);
+    });
+
+    test('legacy and unknown permission modes fail safe', () {
+      expect(
+        WorkspaceBinding.fromExtras({
+          WorkspaceBinding.keyAllowAll: true,
+        }).permissionMode,
+        PermissionMode.requestApproval,
+      );
+      expect(
+        WorkspaceBinding.fromExtras({
+          WorkspaceBinding.keyPermissionMode: 'unknown',
+        }).permissionMode,
+        PermissionMode.requestApproval,
+      );
+    });
+
+    test('every explicit mode round trips', () {
+      for (final mode in PermissionMode.values) {
+        final binding = WorkspaceBinding(
+          workspaceId: 'ws-1',
+          permissionMode: mode,
+        );
+        expect(
+          WorkspaceBinding.fromExtras(binding.applyTo({})).permissionMode,
+          mode,
+        );
+      }
     });
   });
 }

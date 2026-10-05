@@ -127,6 +127,7 @@ void main() {
               'workspace.cwd': 'src',
               'workspace.tools_used': true,
               'workspace.allowAll': true,
+              'workspace.permissionMode': 'fullAccess',
               'other.feature': 'keep',
             }),
           ],
@@ -146,6 +147,7 @@ void main() {
         final extras = jsonDecode(row.read<String>('extras_json')) as Map;
         expect(extras['other.feature'], 'keep');
         expect(extras, isNot(contains('workspace.allowAll')));
+        expect(extras, isNot(contains('workspace.permissionMode')));
         if (row.read<String>('id') == 'managed') {
           expect(extras['workspace.id'], 'managed');
           expect(extras['workspace.cwd'], 'src');

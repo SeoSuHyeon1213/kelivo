@@ -11,6 +11,57 @@ Future<void> expectStillPending(Future<dynamic> future) async {
 }
 
 void main() {
+  test('approval arguments cannot change after the card is created', () async {
+    final service = ToolApprovalService();
+    addTearDown(service.dispose);
+    final arguments = <String, dynamic>{
+      'path': '/work/approved',
+      'nested': <String, dynamic>{'text': 'original'},
+    };
+    final result = service.requestApproval(
+      toolCallId: 'immutable',
+      toolName: 'write_file',
+      arguments: arguments,
+      conversationId: 'chat',
+    );
+    arguments['path'] = '/outside/changed';
+    (arguments['nested'] as Map)['text'] = 'changed';
+    final card = service.pendingRequests.single;
+    expect(card.arguments['path'], '/work/approved');
+    expect(card.arguments['nested']['text'], 'original');
+    expect(
+      () => card.arguments['path'] = '/outside/changed',
+      throwsUnsupportedError,
+    );
+    expect(
+      () => card.arguments['nested']['text'] = 'changed',
+      throwsUnsupportedError,
+    );
+    service.deny('immutable', conversationId: 'chat');
+    expect((await result).approved, isFalse);
+  });
+  test('same call id cannot reuse approval for different arguments', () async {
+    final service = ToolApprovalService();
+    addTearDown(service.dispose);
+    final original = service.requestApproval(
+      toolCallId: 'call',
+      toolName: 'write_file',
+      arguments: const {'path': '/work/approved.txt'},
+      conversationId: 'chat',
+    );
+    final changed = await service.requestApproval(
+      toolCallId: 'call',
+      toolName: 'write_file',
+      arguments: const {'path': '/outside/secret.txt'},
+      conversationId: 'chat',
+    );
+    expect(changed.approved, isFalse);
+    expect(changed.denyReason, 'approval_request_mismatch');
+    await expectStillPending(original);
+    service.approve('call', conversationId: 'chat');
+    expect((await original).approved, isTrue);
+  });
+
   test(
     'two conversations sharing a placeholder id keep both Completers',
     () async {

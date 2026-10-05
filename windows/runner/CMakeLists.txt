@@ -39,3 +39,10 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# Bundled shell supervisor: a suspended child joins a kill-on-close job before
+# any user code runs. No fallback to an unmanaged shell is permitted.
+add_executable(kelivo_process_launcher "process_launcher.cpp")
+apply_standard_settings(kelivo_process_launcher)
+target_compile_definitions(kelivo_process_launcher PRIVATE "NOMINMAX")
+add_dependencies(${BINARY_NAME} kelivo_process_launcher)

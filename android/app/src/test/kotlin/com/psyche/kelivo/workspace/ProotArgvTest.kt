@@ -83,15 +83,17 @@ class ProotArgvTest {
     }
 
     @Test
-    fun readOnlyPreferenceUsesUnmodifiedProotForExecAndPty() {
+    fun readOnlyMountsRejectExecAndPtyBeforeLaunch() {
         for (command in listOf("echo hello", null)) {
             val binds = listOf(BindMount("/storage/My Notes", "/mounts/Notes", true))
             validateExternalMounts(binds)
-            val launch = ProotCommand.build(File("/libs"), File("/rootfs"), File("/tmp"), binds, "/workspace", command, emptyMap())
-            assertEquals("/libs/libproot_exec.so", launch.argv.first())
-            assertTrue(launch.argv.contains("/storage/My Notes:/mounts/Notes"))
-            assertFalse(launch.argv.any { it.startsWith("--read-only") })
-            assertFalse(launch.processEnv.containsKey("PROOT_NO_SECCOMP"))
+            var rejected = false
+            try {
+                ProotCommand.build(File("/libs"), File("/rootfs"), File("/tmp"), binds, "/workspace", command, emptyMap())
+            } catch (error: IllegalArgumentException) {
+                rejected = error.message!!.contains("read-only")
+            }
+            assertTrue("Read-only mount must never reach PRoot", rejected)
         }
     }
 

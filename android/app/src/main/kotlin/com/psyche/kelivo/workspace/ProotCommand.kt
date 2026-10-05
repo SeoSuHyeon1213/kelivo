@@ -43,6 +43,9 @@ object ProotCommand {
         shell: String? = null,
         includeLibraryPath: Boolean = File(nativeLibDir, TALLOC_LIB).isFile,
     ): ProotLaunch {
+        require(binds.none { it.readOnly }) {
+            "Shell blocked: PRoot cannot enforce read-only mounts. Use file tools or unmount these folders."
+        }
         val guestCwd = validateGuestCwd(cwd)
         require(extraArgs.none { it.contains('\u0000') }) { "PRoot argument contains a NUL byte" }
         val guestShell = shell?.takeIf { it.isNotBlank() } ?: if (

@@ -10,17 +10,7 @@ import 'package:socks5_proxy/socks_client.dart' as socks;
 
 import '../logging/log_redactor.dart';
 import 'request_logger.dart';
-
-Future<InternetAddress?> _resolveProxyAddress(String host) async {
-  final parsed = InternetAddress.tryParse(host);
-  if (parsed != null) return parsed;
-  try {
-    final list = await InternetAddress.lookup(host);
-    return list.isNotEmpty ? list.first : null;
-  } catch (_) {
-    return null;
-  }
-}
+import 'proxy_connection_policy.dart';
 
 Future<Uint8List> _readLimited(Stream<List<int>> stream, int maxBytes) async {
   final out = BytesBuilder(copy: false);
@@ -34,22 +24,6 @@ Future<Uint8List> _readLimited(Stream<List<int>> stream, int maxBytes) async {
     }
   }
   return out.takeBytes();
-}
-
-ConnectionTask<Socket> _directConnection(Uri uri, SecurityContext? context) {
-  if (uri.scheme == 'https') {
-    final Future<SecureSocket> socket = SecureSocket.connect(
-      uri.host,
-      uri.port,
-      context: context,
-    );
-    return ConnectionTask.fromSocket(
-      socket,
-      () async => (await socket).close(),
-    );
-  }
-  final Future<Socket> socket = Socket.connect(uri.host, uri.port);
-  return ConnectionTask.fromSocket(socket, () async => (await socket).close());
 }
 
 class NetworkProxyConfig {
@@ -69,7 +43,12 @@ class NetworkProxyConfig {
     this.password,
   });
 
-  bool get isValid => enabled && host.trim().isNotEmpty && port > 0;
+  bool get isValid =>
+      enabled &&
+      host.trim().isNotEmpty &&
+      port > 0 &&
+      port <= 65535 &&
+      {'http', 'socks5'}.contains(type);
 }
 
 /// Bodies past this are file uploads; the log records their size only.
@@ -96,16 +75,18 @@ class DioHttpClient extends http.BaseClient {
             final client = HttpClient();
             client.connectionTimeout = null;
             client.idleTimeout = const Duration(days: 3650);
+            if (_proxy?.enabled == true && !_proxy!.isValid) {
+              throw const ProxyConnectionException(
+                'Invalid proxy configuration; direct connection is blocked',
+              );
+            }
             if (_proxy?.isValid == true) {
               final p = _proxy!;
               if (p.type == 'socks5') {
-                Future<InternetAddress?>? proxyAddrFuture;
+                Future<InternetAddress>? proxyAddrFuture;
                 client.connectionFactory = (uri, proxyHost, proxyPort) async {
-                  proxyAddrFuture ??= _resolveProxyAddress(p.host);
-                  final proxyAddr = await proxyAddrFuture;
-                  if (proxyAddr == null) {
-                    return _directConnection(uri, null);
-                  }
+                  final proxyAddr = await (proxyAddrFuture ??=
+                      resolveRequiredProxyAddress(p.host));
 
                   final proxies = <socks.ProxySettings>[
                     socks.ProxySettings(

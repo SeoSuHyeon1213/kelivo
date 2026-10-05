@@ -372,8 +372,8 @@ void main() {
     expect(find.byKey(WorkspaceSection.unbindKey), findsOneWidget);
     expect(find.text(l10n.workspaceEntryChange), findsNothing);
     expect(find.text(l10n.workspaceEntryUnbind), findsNothing);
-    expect(find.text(l10n.workspaceEntryAllowAll), findsOneWidget);
-    expect(find.text(l10n.workspaceEntryAllowAllSubtitle), findsOneWidget);
+    expect(find.text(l10n.securityPermissionsTitle), findsOneWidget);
+    expect(find.text(l10n.securityModeRequest), findsOneWidget);
     // Files rides on the name row as an icon button, and session skills live
     // in the ＋ sheet now.
     expect(find.text(l10n.workspaceEntryFiles), findsNothing);
@@ -456,7 +456,9 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('allow-all switch writes keyAllowAll', (tester) async {
+  testWidgets('permission page selects full access and can revoke it', (
+    tester,
+  ) async {
     final workspace = await tester.runAsync(
       () => workspaces.create(name: 'Tools'),
     );
@@ -472,12 +474,28 @@ void main() {
       WorkspaceBinding.fromExtras(chat.conversation!.extras).allowAll,
       isFalse,
     );
-    await tester.ensureVisible(find.byKey(WorkspaceSection.allowAllKey));
-    await tester.tap(find.byKey(WorkspaceSection.allowAllKey));
-    await tester.pump();
+    await tester.ensureVisible(find.byKey(WorkspaceSection.permissionsKey));
+    await tester.tap(find.byKey(WorkspaceSection.permissionsKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('permission-mode-fullAccess')));
+    await tester.pumpAndSettle();
     expect(
       WorkspaceBinding.fromExtras(chat.conversation!.extras).allowAll,
       isTrue,
+    );
+    await tester.tap(find.byKey(const ValueKey('permission-mode-policyAuto')));
+    await tester.pumpAndSettle();
+    expect(
+      chat.conversation!.extras[WorkspaceBinding.keyPermissionMode],
+      'policyAuto',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('permission-mode-requestApproval')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      WorkspaceBinding.fromExtras(chat.conversation!.extras).allowAll,
+      isFalse,
     );
   });
 

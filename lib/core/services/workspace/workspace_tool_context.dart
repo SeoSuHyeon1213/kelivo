@@ -18,6 +18,8 @@ class WorkspaceToolContext {
     this.runtimeStatus,
     this.runtimeRegistered = false,
     this.skillsOnly = false,
+    this.checkFileAccess,
+    this.currentBinding,
   });
 
   /// Sandboxed `read_file` over `/skills` when no workspace is bound.
@@ -60,6 +62,24 @@ class WorkspaceToolContext {
   final RuntimeStatus? runtimeStatus;
   final bool runtimeRegistered;
   final bool skillsOnly;
+  final Future<void> Function(ResolvedPath path)? checkFileAccess;
+  final WorkspaceBinding? Function()? currentBinding;
+
+  WorkspaceToolContext withFileAccess(
+    Future<void> Function(ResolvedPath path) guard,
+  ) => WorkspaceToolContext(
+    workspace: workspace,
+    binding: binding,
+    paths: paths,
+    sessionDir: sessionDir,
+    outputsDir: outputsDir,
+    conversationId: conversationId,
+    runtimeStatus: runtimeStatus,
+    runtimeRegistered: runtimeRegistered,
+    skillsOnly: skillsOnly,
+    checkFileAccess: guard,
+    currentBinding: currentBinding,
+  );
 
   String get cwd {
     final raw = binding.cwd.isNotEmpty ? binding.cwd : workspace.defaultCwd;

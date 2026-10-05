@@ -41,7 +41,7 @@ class WorkspacePaths {
        workspaceHostRoot = _canonHost(workspaceHostRoot),
        sessionHostDir = _canonHost(sessionHostDir),
        skillsHostDir = _canonHost(skillsHostDir),
-       tmpHostRoot = _canonHost(Directory.systemTemp.path);
+       tmpHostRoot = _canonHost(p.join(sessionHostDir, 'tmp'));
 
   WorkspacePaths.native({
     required String workspaceHostRoot,
@@ -53,7 +53,7 @@ class WorkspacePaths {
        workspaceHostRoot = _canonHost(workspaceHostRoot),
        sessionHostDir = _canonHost(sessionHostDir),
        skillsHostDir = _canonHost(skillsHostDir),
-       tmpHostRoot = _canonHost(Directory.systemTemp.path);
+       tmpHostRoot = _canonHost(p.join(sessionHostDir, 'tmp'));
 
   final bool sandboxed;
   final String workspaceHostRoot;
@@ -147,6 +147,10 @@ class WorkspacePaths {
     if (workspaceRel != null) {
       return _guestJoin(guestWorkspace, workspaceRel);
     }
+    final tmpRel = relativeToHostRoot(tmpHostRoot, hostPath);
+    if (tmpRel != null) {
+      return _guestJoin(guestTmp, tmpRel);
+    }
     final chatRel = relativeToHostRoot(sessionHostDir, hostPath);
     if (chatRel != null) {
       return _guestJoin(guestChat, chatRel);
@@ -154,10 +158,6 @@ class WorkspacePaths {
     final skillsRel = relativeToHostRoot(skillsHostDir, hostPath);
     if (skillsRel != null) {
       return _guestJoin(guestSkills, skillsRel);
-    }
-    final tmpRel = relativeToHostRoot(tmpHostRoot, hostPath);
-    if (tmpRel != null) {
-      return _guestJoin(guestTmp, tmpRel);
     }
     return _canonHost(hostPath);
   }
@@ -318,9 +318,9 @@ class WorkspacePaths {
     if (_hostInside(workspaceHostRoot, hostPath)) {
       return WorkspaceZone.workspace;
     }
+    if (_hostInside(tmpHostRoot, hostPath)) return WorkspaceZone.tmp;
     if (_hostInside(sessionHostDir, hostPath)) return WorkspaceZone.chat;
     if (_hostInside(skillsHostDir, hostPath)) return WorkspaceZone.skills;
-    if (_hostInside(tmpHostRoot, hostPath)) return WorkspaceZone.tmp;
     return WorkspaceZone.outside;
   }
 

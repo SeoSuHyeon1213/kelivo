@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
+import 'core/services/security/secret_protection.dart';
+import 'core/services/security/secret_store.dart';
 import 'dart:ui' show AppExitResponse;
 import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
@@ -284,6 +286,7 @@ Future<void> main() async {
                 await BusinessStartupGate.migrateAndLoad(
                   repository: databaseLease.businessRepository,
                   legacyPreferences: legacyPreferences,
+                  secrets: SecretProtection(const PlatformSecretStore()),
                 );
             processDatabaseLease = databaseLease;
             businessPreferences = loadedBusinessPreferences;

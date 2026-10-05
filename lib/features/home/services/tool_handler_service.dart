@@ -14,6 +14,7 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/tool_call_cancellation.dart';
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -485,6 +486,7 @@ class ToolHandlerService {
 
     return (name, args, {toolCallId}) async {
       try {
+        args = Map<String, dynamic>.from(jsonDecode(jsonEncode(args)) as Map);
         if (workspaceContext != null &&
             workspaceTools != null &&
             WorkspaceToolsService.toolNames.contains(name)) {
@@ -523,9 +525,16 @@ class ToolHandlerService {
         // Creating calendar events or changing reminders modifies user data,
         // so those tools always require explicit user approval first.
         if (LocalToolNames.requiresUserApproval.contains(name) &&
+            name != LocalToolNames.clipboard &&
             assistant != null &&
-            assistant.localToolIds.contains(name) &&
-            approvalService != null) {
+            assistant.localToolIds.contains(name)) {
+          if (approvalService == null) {
+            return _toolError(
+              error: 'approval_required',
+              message: 'Approval service is unavailable.',
+              tool: name,
+            );
+          }
           final approval = await approvalService.requestApproval(
             toolCallId: approvalIdFor(name, toolCallId),
             toolName: name,
@@ -561,6 +570,49 @@ class ToolHandlerService {
           name,
           args,
           assistant,
+          authorizeClipboard: () async {
+            final cancellation = ToolCallCancellation.current;
+            cancellation?.throwIfCancelled();
+            if (approvalService == null ||
+                !const {'read', 'write'}.contains(args['action']))
+              return false;
+            final id = approvalIdFor(name, toolCallId);
+            final pending = approvalService.requestApproval(
+              toolCallId: id,
+              toolName: name,
+              arguments: args,
+              conversationId: conversationId,
+            );
+            final approval = cancellation == null
+                ? await pending
+                : await Future.any([
+                    pending,
+                    cancellation.cancelled.then((_) {
+                      if (identical(
+                        approvalService
+                            .pendingFor(
+                              toolCallId: id,
+                              conversationId: conversationId,
+                            )
+                            ?.future,
+                        pending,
+                      ))
+                        approvalService.deny(
+                          id,
+                          conversationId: conversationId,
+                          reason: 'cancelled',
+                        );
+                      return ToolApprovalResult.denied('cancelled');
+                    }),
+                  ]);
+            cancellation?.throwIfCancelled();
+            final current = assistant == null
+                ? null
+                : assistantProvider.getById(assistant.id);
+            return approval.approved &&
+                current != null &&
+                current.localToolIds.contains(LocalToolNames.clipboard);
+          },
           onSpeakText: (text) async {
             final tts = contextProvider.read<TtsProvider>();
             if (!tts.isAvailable) {

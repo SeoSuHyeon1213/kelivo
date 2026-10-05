@@ -12,6 +12,8 @@ import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
 import '../../models/workspace_binding.dart';
+import '../../models/permission_mode.dart';
+import '../permissions/permission_service.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
 import '../../providers/external_mounts_provider.dart';
@@ -75,6 +77,8 @@ class WorkspaceToolsService {
   static String get _shellInvocation =>
       defaultTargetPlatform == TargetPlatform.android
       ? 'configured shell -lc'
+      : defaultTargetPlatform == TargetPlatform.windows
+      ? 'PowerShell -NoProfile -NonInteractive -Command'
       : 'sh -lc';
 
   final ToolRunRegistry registry;
@@ -130,6 +134,7 @@ class WorkspaceToolsService {
         : (Platform.isAndroid || Platform.isIOS);
 
     final sessionDir = await AppDirectories.sessionDir(conversationId);
+    await Directory(p.join(sessionDir.path, 'tmp')).create(recursive: true);
     final skillsDir = await AppDirectories.getSkillsDirectory();
     final paths = sandboxed
         ? WorkspacePaths.sandboxed(
@@ -154,6 +159,12 @@ class WorkspaceToolsService {
       conversationId: conversationId,
       runtimeStatus: status,
       runtimeRegistered: runtime != null,
+      currentBinding: () {
+        final current = chatService.getConversation(conversationId);
+        return current == null
+            ? null
+            : WorkspaceBinding.fromExtras(current.extras);
+      },
     );
   }
 
@@ -406,7 +417,8 @@ class WorkspaceToolsService {
         '- ${ExternalMount.root}/<name>/ — user-mounted external folders '
         '$source, shared across workspaces. '
         'Names and availability vary: list ${ExternalMount.root}/ first for external/user files. '
-        'File tools reject writes to read-only mounts; respect this in Shell too.'
+        'File tools reject writes to read-only mounts. Shell is blocked while '
+        'read-only external mounts are present.'
         '${readOnly.isEmpty ? '' : ' Read-only: $readOnly.'}',
       );
     }
@@ -510,6 +522,20 @@ class WorkspaceToolsService {
       ToolCallCancellation.current?.throwIfCancelled();
       await ctx.paths.refreshExternalMounts();
       ToolCallCancellation.current?.throwIfCancelled();
+      // Snapshot arguments before showing an approval card.
+      args = Map<String, dynamic>.from(jsonDecode(jsonEncode(args)) as Map);
+      if (name != 'shell' && !ctx.skillsOnly) {
+        final authorized = await _authorizeFile(
+          ctx,
+          name,
+          args,
+          toolCallId,
+          approvalService,
+          conversationId ?? ctx.conversationId,
+        );
+        if (authorized.$2 != null) return authorized.$2;
+        ctx = authorized.$1;
+      }
       switch (name) {
         case 'shell':
           return await _handleShell(
@@ -553,6 +579,8 @@ class WorkspaceToolsService {
             message: 'Unknown workspace tool: $name',
           );
       }
+    } on PathResolutionException catch (e) {
+      return _errorResult(tool: name, error: 'path_error', message: e.message);
     } catch (e) {
       return _errorResult(
         tool: name,
@@ -698,25 +726,52 @@ class WorkspaceToolsService {
     }
 
     final sandboxed = status.sandboxed;
-    final needsApproval =
-        (ctx.workspace.shellNeedsApproval || !sandboxed) &&
-        !ctx.binding.allowAll;
+    final cwd = ctx.paths.normalizeCwd(
+      _stringArg(args, 'cwd', fallback: ctx.cwd),
+    );
+    final resolvedCwd = await ctx.paths.resolveReal(cwd, cwd: ctx.cwd);
+    final decision = _shellDecision(ctx, command, resolvedCwd.hostPath);
+    if (decision == PermissionDecision.deny) {
+      return _deniedResult(
+        tool: tool,
+        error: ctx.paths.externalMounts.any((mount) => mount.readOnly)
+            ? 'readonly_shell_blocked'
+            : 'permission_rule_denied',
+        message:
+            'Shell is blocked by the access policy or read-only external mounts. '
+            'Use file tools, or unmount these folders before running a shell.',
+      );
+    }
+    final needsApproval = decision == PermissionDecision.requestApproval;
     final denied = await _maybeApprove(
       approvalService,
       needed: needsApproval,
       toolCallId: toolCallId,
       toolName: tool,
-      args: args,
+      args: {...args, 'resolved_cwd': resolvedCwd.hostPath},
       conversationId: conversationId ?? ctx.conversationId,
     );
     if (denied != null) return denied;
+    ToolCallCancellation.current?.throwIfCancelled();
+    await ctx.paths.refreshExternalMounts();
+    if (!_bindingValid(ctx) ||
+        !_enabled(ctx, tool) ||
+        ctx.paths.externalMounts.any((mount) => mount.readOnly) ||
+        _shellDecision(ctx, command, resolvedCwd.hostPath) ==
+            PermissionDecision.deny ||
+        (!needsApproval &&
+            _shellDecision(ctx, command, resolvedCwd.hostPath) !=
+                PermissionDecision.allow)) {
+      return _deniedResult(
+        tool: tool,
+        error: 'permission_changed',
+        message: 'Permissions changed before shell execution; request again.',
+      );
+    }
 
     final timeoutSeconds = (_intArg(args, 'timeout_seconds') ?? 900).clamp(
       1,
       3600,
-    );
-    final cwd = ctx.paths.normalizeCwd(
-      _stringArg(args, 'cwd', fallback: ctx.cwd),
     );
     final env = <String, String>{
       if (!sandboxed) ...Platform.environment,
@@ -746,6 +801,24 @@ class WorkspaceToolsService {
     Object? executionError;
     var executing = false;
     try {
+      cancellation?.throwIfCancelled();
+      await ctx.paths.refreshExternalMounts();
+      if (!_bindingValid(ctx) ||
+          !_enabled(ctx, tool) ||
+          ctx.paths.externalMounts.any((mount) => mount.readOnly) ||
+          !p.equals(
+            (await ctx.paths.resolveReal(cwd, cwd: ctx.cwd)).hostPath,
+            resolvedCwd.hostPath,
+          ) ||
+          _shellDecision(ctx, command, resolvedCwd.hostPath) ==
+              PermissionDecision.deny ||
+          (!needsApproval &&
+              _shellDecision(ctx, command, resolvedCwd.hostPath) !=
+                  PermissionDecision.allow)) {
+        throw const HostFileException(
+          'Permissions changed before shell execution; request again.',
+        );
+      }
       cancellation?.throwIfCancelled();
       executing = true;
       unawaited(
@@ -929,6 +1002,7 @@ class WorkspaceToolsService {
       if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
         throw const PathResolutionException('Path is outside sandbox zones');
       }
+      await ctx.checkFileAccess?.call(resolved);
       final image = await WorkspaceImage.read(resolved.hostPath);
       ToolCallCancellation.current?.throwIfCancelled();
       final imagesDir = await AppDirectories.getImagesDirectory();
@@ -989,7 +1063,7 @@ class WorkspaceToolsService {
           message: 'read_file is limited to /skills in skills-only mode',
         );
       }
-      final result = await HostFileTools(ctx.paths).readFile(
+      final result = await _files(ctx).readFile(
         path,
         offset: _intArg(args, 'offset'),
         limit: _intArg(args, 'limit'),
@@ -1102,10 +1176,7 @@ class WorkspaceToolsService {
     if (denied != null) return denied;
 
     try {
-      final result = await HostFileTools(
-        ctx.paths,
-        checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
-      ).writeFile(path, content, cwd: ctx.cwd);
+      final result = await _files(ctx).writeFile(path, content, cwd: ctx.cwd);
       final link = linkFor(resolved, paths: ctx.paths);
       final body = <String, Object?>{
         'ok': true,
@@ -1183,17 +1254,13 @@ class WorkspaceToolsService {
     if (denied != null) return denied;
 
     try {
-      final result =
-          await HostFileTools(
-            ctx.paths,
-            checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
-          ).editFile(
-            path,
-            args['old_string']?.toString() ?? '',
-            args['new_string']?.toString() ?? '',
-            replaceAll: _boolArg(args, 'replace_all'),
-            cwd: ctx.cwd,
-          );
+      final result = await _files(ctx).editFile(
+        path,
+        args['old_string']?.toString() ?? '',
+        args['new_string']?.toString() ?? '',
+        replaceAll: _boolArg(args, 'replace_all'),
+        cwd: ctx.cwd,
+      );
       final link = linkFor(resolved, paths: ctx.paths);
       final body = <String, Object?>{
         'ok': true,
@@ -1241,8 +1308,8 @@ class WorkspaceToolsService {
     const tool = 'list_dir';
     final path = _stringArg(args, 'path', fallback: ctx.cwd);
     try {
-      final result = await HostFileTools(
-        ctx.paths,
+      final result = await _files(
+        ctx,
       ).listDir(path, depth: _intArg(args, 'depth') ?? 1, cwd: ctx.cwd);
       final lines = <String>[
         for (final entry in result.entries)
@@ -1292,8 +1359,8 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final result = await HostFileTools(
-        ctx.paths,
+      final result = await _files(
+        ctx,
       ).glob(pattern, path: _optionalString(args, 'path'), cwd: ctx.cwd);
       final lines = List<String>.from(result.paths);
       if (result.truncated) lines.add('... truncated');
@@ -1332,7 +1399,7 @@ class WorkspaceToolsService {
       );
     }
     try {
-      final result = await HostFileTools(ctx.paths).grep(
+      final result = await _files(ctx).grep(
         pattern,
         path: _optionalString(args, 'path'),
         cwd: ctx.cwd,
@@ -1365,6 +1432,136 @@ class WorkspaceToolsService {
     }
   }
 
+  static const _permissions = PermissionService();
+
+  PermissionMode _mode(WorkspaceToolContext ctx) =>
+      (ctx.currentBinding?.call() ?? ctx.binding).permissionMode;
+
+  PermissionDecision _shellDecision(
+    WorkspaceToolContext ctx,
+    String command,
+    String cwd,
+  ) => _permissions.decide(
+    mode: _mode(ctx),
+    action: PermissionAction.shell,
+    hasReadOnlyMounts: ctx.paths.externalMounts.any((mount) => mount.readOnly),
+    rules: (ctx.currentBinding?.call() ?? ctx.binding).permissionRules,
+    resource: cwd,
+    shellCommand: command,
+    windows: Platform.isWindows,
+  );
+
+  bool _bindingValid(WorkspaceToolContext ctx) {
+    if (ctx.currentBinding == null) return true;
+    final current = ctx.currentBinding!();
+    return current != null &&
+        current.workspaceId == ctx.binding.workspaceId &&
+        current.cwd == ctx.binding.cwd;
+  }
+
+  HostFileTools _files(WorkspaceToolContext ctx) => HostFileTools(
+    ctx.paths,
+    checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
+    checkPath: ctx.checkFileAccess,
+  );
+
+  Future<(WorkspaceToolContext, Object?)> _authorizeFile(
+    WorkspaceToolContext ctx,
+    String tool,
+    Map<String, dynamic> args,
+    String toolCallId,
+    ToolApprovalService? approvalService,
+    String? conversationId,
+  ) async {
+    if (!toolNames.contains(tool)) return (ctx, null);
+    final writes = tool == 'write_file' || tool == 'edit_file';
+    final directoryTool = {'list_dir', 'glob', 'grep'}.contains(tool);
+    final path = _stringArg(
+      args,
+      'path',
+      fallback: directoryTool
+          ? (tool == 'list_dir' ? ctx.cwd : ctx.paths.modelRoot)
+          : '',
+    );
+    if (path.isEmpty) return (ctx, null); // handler reports invalid arguments
+    final mountsRoot =
+        ctx.paths.sandboxed &&
+        tool == 'list_dir' &&
+        p.posix.normalize(path) == ExternalMount.root;
+    final resolved = mountsRoot
+        ? null
+        : await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+    PermissionDecision decisionFor(ResolvedPath target) => _permissions.decide(
+      mode: _mode(ctx),
+      action: writes ? PermissionAction.write : PermissionAction.read,
+      outsideWorkspace: target.zone == WorkspaceZone.outside,
+      sandboxed: ctx.paths.sandboxed,
+      readOnly: ctx.paths.isReadOnlyPath(target.hostPath),
+      skills: target.zone == WorkspaceZone.skills,
+      rules: (ctx.currentBinding?.call() ?? ctx.binding).permissionRules,
+      resource: target.hostPath,
+      windows: Platform.isWindows,
+    );
+    final decision = resolved == null
+        ? PermissionDecision.allow
+        : decisionFor(resolved);
+    if (decision == PermissionDecision.deny) {
+      return (
+        ctx,
+        _deniedResult(
+          tool: tool,
+          error: resolved != null && ctx.paths.isReadOnlyPath(resolved.hostPath)
+              ? 'mount_readonly'
+              : resolved?.zone == WorkspaceZone.skills
+              ? 'skills_readonly'
+              : 'path_outside',
+          message: 'This path is restricted by the file access policy',
+          path: resolved?.modelPath,
+        ),
+      );
+    }
+    final approved = decision == PermissionDecision.requestApproval;
+    final denied = await _maybeApprove(
+      approvalService,
+      needed: approved,
+      toolCallId: toolCallId,
+      toolName: tool,
+      args: {...args, if (resolved != null) 'resolved_path': resolved.hostPath},
+      conversationId: conversationId,
+      path: resolved?.modelPath,
+    );
+    if (denied != null) return (ctx, denied);
+    final approvedMode = _mode(ctx);
+    final guard = (ResolvedPath target) async {
+      ToolCallCancellation.current?.throwIfCancelled();
+      if (!_bindingValid(ctx) ||
+          !_enabled(ctx, tool) ||
+          _mode(ctx) != approvedMode) {
+        throw const HostFileException('Permissions changed; request again');
+      }
+      final withinGrant = resolved == null
+          ? target.zone == WorkspaceZone.external
+          : p.equals(resolved.hostPath, target.hostPath) ||
+                (directoryTool &&
+                    p.isWithin(resolved.hostPath, target.hostPath));
+      if (!withinGrant) {
+        throw const HostFileException(
+          'Path changed or escapes the approved scope',
+        );
+      }
+      final currentDecision = decisionFor(target);
+      if (currentDecision == PermissionDecision.deny ||
+          (!approved && currentDecision != PermissionDecision.allow)) {
+        throw const HostFileException('File access is no longer permitted');
+      }
+    };
+    // Re-resolve after the approval wait: a junction may have changed meanwhile.
+    await ctx.paths.refreshExternalMounts();
+    if (resolved != null)
+      await guard(await ctx.paths.resolveReal(path, cwd: ctx.cwd));
+    return (ctx.withFileAccess(guard), null);
+  }
+
   Future<Object?> _approveWrite(
     WorkspaceToolContext ctx,
     ResolvedPath resolved, {
@@ -1390,22 +1587,11 @@ class WorkspaceToolsService {
         path: resolved.modelPath,
       );
     }
-    if (resolved.zone == WorkspaceZone.outside) {
-      if (ctx.paths.sandboxed) {
-        return _deniedResult(
-          tool: tool,
-          error: 'path_outside',
-          message: 'Writes outside the workspace are not allowed',
-          path: resolved.modelPath,
-        );
-      }
-      return _maybeApprove(
-        approvalService,
-        needed: true,
-        toolCallId: toolCallId,
-        toolName: tool,
-        args: args,
-        conversationId: conversationId ?? ctx.conversationId,
+    if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
+      return _deniedResult(
+        tool: tool,
+        error: 'path_outside',
+        message: 'Path is outside sandbox zones',
         path: resolved.modelPath,
       );
     }
@@ -1434,12 +1620,30 @@ class WorkspaceToolsService {
     final id = toolCallId.trim().isEmpty
         ? '${toolName}_${DateTime.now().microsecondsSinceEpoch}'
         : toolCallId;
-    final result = await approvalService.requestApproval(
+    final pending = approvalService.requestApproval(
       toolCallId: id,
       toolName: toolName,
-      arguments: args,
+      arguments: Map<String, dynamic>.from(jsonDecode(jsonEncode(args)) as Map),
       conversationId: conversationId,
     );
+    final cancellation = ToolCallCancellation.current;
+    final result = cancellation == null
+        ? await pending
+        : await Future.any([
+            pending,
+            cancellation.cancelled.then((_) {
+              if (identical(
+                approvalService
+                    .pendingFor(toolCallId: id, conversationId: conversationId)
+                    ?.future,
+                pending,
+              )) {
+                approvalService.deny(id, conversationId: conversationId);
+              }
+              return ToolApprovalResult.denied('cancelled');
+            }),
+          ]);
+    cancellation?.throwIfCancelled();
     if (result.approved) return null;
     return _deniedResult(
       tool: toolName,
@@ -1467,7 +1671,8 @@ class WorkspaceToolsService {
           workspaceId: current.workspaceId,
           cwd: current.cwd,
           toolsUsed: true,
-          allowAll: current.allowAll,
+          permissionMode: current.permissionMode,
+          permissionRules: current.permissionRules,
         ).applyTo(extras);
       });
       await touchLastUsed?.call(ctx.workspace.id);

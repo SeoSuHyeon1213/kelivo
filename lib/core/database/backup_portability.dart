@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'app_database.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
+import '../services/security/secret_protection.dart';
 
 /// Device state stays in SQLite at runtime, but must not travel in a backup.
 final class BackupPortability {
@@ -41,9 +42,21 @@ final class BackupPortability {
         _withoutLinkedDefault(row, linkedIds),
     ];
     return BusinessSnapshot(
-      entities: entities,
-      preferences: {...source.preferences}
-        ..removeWhere((key, _) => devicePreferenceKeys.contains(key)),
+      entities: {
+        for (final entry in entities.entries)
+          entry.key: [
+            for (final row in entry.value)
+              row.copyWith(
+                payload: jsonEncode(
+                  SecretProtection.redact(jsonDecode(row.payload)),
+                ),
+              ),
+          ],
+      },
+      preferences: {
+        for (final entry in source.preferences.entries)
+          entry.key: SecretProtection.redactPreference(entry.key, entry.value),
+      }..removeWhere((key, _) => devicePreferenceKeys.contains(key)),
     );
   }
 
@@ -105,12 +118,14 @@ final class BackupPortability {
             )
           THEN json_remove(extras_json, '\$."workspace.id"',
             '\$."workspace.cwd"', '\$."workspace.tools_used"',
-            '\$."workspace.allowAll"')
-          ELSE json_remove(extras_json, '\$."workspace.allowAll"')
+            '\$."workspace.allowAll"', '\$."workspace.permissionMode"', '\$."workspace.permissionRules"')
+          ELSE json_remove(extras_json, '\$."workspace.allowAll"', '\$."workspace.permissionMode"', '\$."workspace.permissionRules"')
         END
         WHERE json_valid(extras_json)
           AND (json_type(extras_json, '\$."workspace.id"') IS NOT NULL
-            OR json_type(extras_json, '\$."workspace.allowAll"') IS NOT NULL);
+            OR json_type(extras_json, '\$."workspace.allowAll"') IS NOT NULL
+            OR json_type(extras_json, '\$."workspace.permissionMode"') IS NOT NULL
+            OR json_type(extras_json, '\$."workspace.permissionRules"') IS NOT NULL);
       ''');
     });
   }

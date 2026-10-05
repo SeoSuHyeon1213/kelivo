@@ -220,7 +220,8 @@ class ChatService extends ChangeNotifier {
         WorkspaceBinding(
           workspaceId: source.workspaceId,
           cwd: source.cwd,
-          allowAll: source.allowAll,
+          permissionMode: source.permissionMode,
+          permissionRules: source.permissionRules,
         ).applyTo({
           if (sourceExtras.containsKey(WorldBookActivation.extrasKey))
             WorldBookActivation.extrasKey:

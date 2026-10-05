@@ -16,6 +16,7 @@ import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
 import '../services/asr/asr_service_options.dart';
 import '../services/network/request_logger.dart';
+import '../services/network/proxy_connection_policy.dart';
 import '../services/logging/context_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../services/learning_mode_store.dart';
@@ -1560,11 +1561,19 @@ class SettingsProvider extends ChangeNotifier {
       final sig = [enabled, type, host, portStr, user, pass, bypass].join('|');
       if (_lastProxySignature == sig) return;
       _lastProxySignature = sig;
-      if (!enabled || host.isEmpty || portStr.isEmpty) {
+      if (!enabled) {
         HttpOverrides.global = null;
         return;
       }
-      final port = int.tryParse(portStr) ?? 8080;
+      final port = int.tryParse(portStr);
+      if (host.isEmpty ||
+          port == null ||
+          port < 1 ||
+          port > 65535 ||
+          !{'http', 'socks5'}.contains(type)) {
+        HttpOverrides.global = BlockingProxyHttpOverrides();
+        return;
+      }
       if (type == 'socks5') {
         HttpOverrides.global = _SocksProxyHttpOverrides(
           host: host,
@@ -1583,7 +1592,9 @@ class SettingsProvider extends ChangeNotifier {
         );
       }
     } catch (_) {
-      // ignore
+      if (_globalProxyEnabled)
+        HttpOverrides.global = BlockingProxyHttpOverrides();
+      _lastProxySignature = '';
     }
   }
 
@@ -5947,7 +5958,7 @@ class _SocksProxyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
-    Future<InternetAddress?>? proxyAddrFuture;
+    Future<InternetAddress>? proxyAddrFuture;
 
     ConnectionTask<Socket> directConnection(Uri uri) {
       if (uri.scheme == 'https') {
@@ -5968,30 +5979,14 @@ class _SocksProxyHttpOverrides extends HttpOverrides {
       );
     }
 
-    Future<InternetAddress?> resolveProxyAddress() async {
-      final parsed = InternetAddress.tryParse(host);
-      if (parsed != null) return parsed;
-      proxyAddrFuture ??= InternetAddress.lookup(
-        host,
-      ).then((list) => list.isNotEmpty ? list.first : null);
-      try {
-        return await proxyAddrFuture;
-      } catch (_) {
-        return null;
-      }
-    }
-
     try {
       client.connectionFactory = (uri, proxyHost, proxyPort) async {
         if (_shouldBypassProxy(uri.host, bypassRules)) {
           return directConnection(uri);
         }
 
-        final proxyAddr = await resolveProxyAddress();
-        if (proxyAddr == null) {
-          // Preserve previous behavior: if proxy cannot be configured, fall back to direct.
-          return directConnection(uri);
-        }
+        final proxyAddr = await (proxyAddrFuture ??=
+            resolveRequiredProxyAddress(host));
 
         final proxies = <socks.ProxySettings>[
           socks.ProxySettings(
@@ -6022,7 +6017,8 @@ class _SocksProxyHttpOverrides extends HttpOverrides {
         );
       };
     } catch (_) {
-      // ignore
+      client.close(force: true);
+      rethrow;
     }
     return client;
   }

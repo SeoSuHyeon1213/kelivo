@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'business_migration_engine.dart';
 import 'business_preferences.dart';
 import 'business_repository.dart';
+import '../services/security/secret_protection.dart';
 
 /// Completes the one-time legacy migration before exposing business state.
 ///
@@ -30,6 +31,7 @@ final class BusinessStartupGate {
   static Future<BusinessPreferences> migrateAndLoad({
     required BusinessRepository repository,
     required LegacyBusinessPreferences legacyPreferences,
+    SecretProtection? secrets,
     @visibleForTesting Future<void> Function()? debugRunMigration,
   }) async {
     lastDegradedReason = null;
@@ -55,7 +57,7 @@ final class BusinessStartupGate {
         stackTrace: stackTrace,
       );
     }
-    final preferences = BusinessPreferences(repository);
+    final preferences = BusinessPreferences(repository, secrets: secrets);
     await preferences.load();
     return preferences;
   }

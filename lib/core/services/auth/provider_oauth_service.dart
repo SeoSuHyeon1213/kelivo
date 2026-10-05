@@ -78,12 +78,12 @@ class ProviderOAuthService extends ChangeNotifier {
     return DioHttpClient(
       logRequests: false,
       timeout: const Duration(seconds: 30),
-      proxy: config.proxyEnabled == true && host.isNotEmpty && port != null
+      proxy: config.proxyEnabled == true
           ? NetworkProxyConfig(
               enabled: true,
               type: ProviderConfig.resolveProxyType(config.proxyType),
               host: host,
-              port: port,
+              port: port ?? 0,
               username: config.proxyUsername,
               password: config.proxyPassword,
             )
