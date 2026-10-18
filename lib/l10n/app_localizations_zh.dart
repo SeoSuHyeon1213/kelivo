@@ -8040,6 +8040,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolApprovalDenyHint => '原因（可选）';
 
   @override
+  String get toolApprovalMoreOptions => '更多批准选项';
+
+  @override
+  String get toolApprovalScopeTitle => '批准';
+
+  @override
+  String get toolApprovalScopeOnce => '仅本次批准';
+
+  @override
+  String get toolApprovalScopeConversation => '在此对话中始终允许';
+
+  @override
+  String get toolApprovalScopeAlways => '始终允许';
+
+  @override
   String toolApprovalDeniedMessage(Object reason, Object toolName) {
     return '工具调用 \"$toolName\" 已被用户拒绝。原因：$reason';
   }
@@ -12207,79 +12222,80 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
-  @override
-  String get securityPermissionsTitle => "工具权限";
 
   @override
-  String get securityModeRequest => "请求批准";
+  String get securityPermissionsTitle => '工具权限';
 
   @override
-  String get securityModeAuto => "按规则批准";
+  String get securityModeRequest => '请求批准';
 
   @override
-  String get securityModeFull => "完全访问";
+  String get securityModeAuto => '按规则批准';
 
   @override
-  String get securityModeRequestHint => "修改文件、读取外部文件和执行命令前请求批准。";
+  String get securityModeFull => '完全访问';
 
   @override
-  String get securityModeAutoHint => "允许工作区内的文件修改和您明确允许的规则。";
+  String get securityModeRequestHint => '修改文件、读取外部文件和执行命令前请求批准。';
 
   @override
-  String get securityModeFullHint => "无需询问即可执行工作区工具。命令可以访问您的用户账户。";
+  String get securityModeAutoHint => '允许工作区内的文件修改和您明确允许的规则。';
+
+  @override
+  String get securityModeFullHint => '无需询问即可执行工作区工具。命令可以访问您的用户账户。';
 
   @override
   String get securityIndependentLimits =>
-      "代理失败时禁止自动直连。剪贴板工具始终需要批准。只读挂载和文件拒绝规则会阻止工作区命令工具。";
+      '代理失败时禁止自动直连。除完全访问外，剪贴板工具需要批准。只读挂载和文件拒绝规则会阻止工作区命令工具。';
 
   @override
-  String get securityRulesTitle => "此对话的批准规则";
+  String get securityRulesTitle => '此对话的批准规则';
 
   @override
   String get securityRulesHint =>
-      "所有模式都优先执行拒绝规则。允许规则仅在规则模式中生效。文件拒绝规则会阻止工作区命令工具。命令允许规则精确匹配完整命令和工作目录；程序仍使用您的用户权限。";
+      '所有模式都优先执行拒绝规则。允许规则仅在规则模式中生效。文件拒绝规则会阻止工作区命令工具。命令允许规则精确匹配完整命令和工作目录；程序仍使用您的用户权限。';
 
   @override
-  String get securityRuleRead => "读取文件";
+  String get securityRuleRead => '读取文件';
 
   @override
-  String get securityRuleWrite => "写入文件";
+  String get securityRuleWrite => '写入文件';
 
   @override
-  String get securityRuleShell => "执行命令";
+  String get securityRuleShell => '执行命令';
 
   @override
-  String get securityRuleDeny => "拒绝";
+  String get securityRuleDeny => '拒绝';
 
   @override
-  String get securityRuleAllow => "按规则允许";
+  String get securityRuleAllow => '按规则允许';
 
   @override
-  String get securityRuleAction => "操作";
+  String get securityRuleAction => '操作';
 
   @override
-  String get securityRuleEffect => "决定";
+  String get securityRuleEffect => '决定';
 
   @override
-  String get securityRulePath => "主机绝对路径（命令：工作目录）";
+  String get securityRulePath => '主机绝对路径（命令：工作目录）';
 
   @override
-  String get securityRuleCommand => "完整命令";
+  String get securityRuleCommand => '完整命令';
 
   @override
-  String get securityRuleRecursive => "包含子文件夹";
+  String get securityRuleRecursive => '包含子文件夹';
 
   @override
-  String get securityRuleAdd => "添加规则";
+  String get securityRuleAdd => '添加规则';
 
   @override
-  String get securityRuleRemove => "删除规则";
+  String get securityRuleRemove => '删除规则';
 
   @override
-  String get securityRuleInvalid => "请输入绝对路径。命令规则还需要完整的命令。";
+  String get securityRuleInvalid => '请输入绝对路径。命令规则还需要完整的命令。';
 
   @override
-  String get securitySaveFailed => "无法保存权限。请确认此对话仍绑定了工作区。";
+  String get securitySaveFailed => '无法保存权限。请确认此对话仍绑定了工作区。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20244,6 +20260,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get toolApprovalDenyHint => '原因（可选）';
 
   @override
+  String get toolApprovalMoreOptions => '更多批准选项';
+
+  @override
+  String get toolApprovalScopeTitle => '批准';
+
+  @override
+  String get toolApprovalScopeOnce => '仅本次批准';
+
+  @override
+  String get toolApprovalScopeConversation => '在此对话中始终允许';
+
+  @override
+  String get toolApprovalScopeAlways => '始终允许';
+
+  @override
   String toolApprovalDeniedMessage(Object reason, Object toolName) {
     return '工具调用 \"$toolName\" 已被用户拒绝。原因：$reason';
   }
@@ -24411,79 +24442,80 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
-  @override
-  String get securityPermissionsTitle => "工具权限";
 
   @override
-  String get securityModeRequest => "请求批准";
+  String get securityPermissionsTitle => '工具权限';
 
   @override
-  String get securityModeAuto => "按规则批准";
+  String get securityModeRequest => '请求批准';
 
   @override
-  String get securityModeFull => "完全访问";
+  String get securityModeAuto => '按规则批准';
 
   @override
-  String get securityModeRequestHint => "修改文件、读取外部文件和执行命令前请求批准。";
+  String get securityModeFull => '完全访问';
 
   @override
-  String get securityModeAutoHint => "允许工作区内的文件修改和您明确允许的规则。";
+  String get securityModeRequestHint => '修改文件、读取外部文件和执行命令前请求批准。';
 
   @override
-  String get securityModeFullHint => "无需询问即可执行工作区工具。命令可以访问您的用户账户。";
+  String get securityModeAutoHint => '允许工作区内的文件修改和您明确允许的规则。';
+
+  @override
+  String get securityModeFullHint => '无需询问即可执行工作区工具。命令可以访问您的用户账户。';
 
   @override
   String get securityIndependentLimits =>
-      "代理失败时禁止自动直连。剪贴板工具始终需要批准。只读挂载和文件拒绝规则会阻止工作区命令工具。";
+      '代理失败时禁止自动直连。除完全访问外，剪贴板工具需要批准。只读挂载和文件拒绝规则会阻止工作区命令工具。';
 
   @override
-  String get securityRulesTitle => "此对话的批准规则";
+  String get securityRulesTitle => '此对话的批准规则';
 
   @override
   String get securityRulesHint =>
-      "所有模式都优先执行拒绝规则。允许规则仅在规则模式中生效。文件拒绝规则会阻止工作区命令工具。命令允许规则精确匹配完整命令和工作目录；程序仍使用您的用户权限。";
+      '所有模式都优先执行拒绝规则。允许规则仅在规则模式中生效。文件拒绝规则会阻止工作区命令工具。命令允许规则精确匹配完整命令和工作目录；程序仍使用您的用户权限。';
 
   @override
-  String get securityRuleRead => "读取文件";
+  String get securityRuleRead => '读取文件';
 
   @override
-  String get securityRuleWrite => "写入文件";
+  String get securityRuleWrite => '写入文件';
 
   @override
-  String get securityRuleShell => "执行命令";
+  String get securityRuleShell => '执行命令';
 
   @override
-  String get securityRuleDeny => "拒绝";
+  String get securityRuleDeny => '拒绝';
 
   @override
-  String get securityRuleAllow => "按规则允许";
+  String get securityRuleAllow => '按规则允许';
 
   @override
-  String get securityRuleAction => "操作";
+  String get securityRuleAction => '操作';
 
   @override
-  String get securityRuleEffect => "决定";
+  String get securityRuleEffect => '决定';
 
   @override
-  String get securityRulePath => "主机绝对路径（命令：工作目录）";
+  String get securityRulePath => '主机绝对路径（命令：工作目录）';
 
   @override
-  String get securityRuleCommand => "完整命令";
+  String get securityRuleCommand => '完整命令';
 
   @override
-  String get securityRuleRecursive => "包含子文件夹";
+  String get securityRuleRecursive => '包含子文件夹';
 
   @override
-  String get securityRuleAdd => "添加规则";
+  String get securityRuleAdd => '添加规则';
 
   @override
-  String get securityRuleRemove => "删除规则";
+  String get securityRuleRemove => '删除规则';
 
   @override
-  String get securityRuleInvalid => "请输入绝对路径。命令规则还需要完整的命令。";
+  String get securityRuleInvalid => '请输入绝对路径。命令规则还需要完整的命令。';
 
   @override
-  String get securitySaveFailed => "无法保存权限。请确认此对话仍绑定了工作区。";
+  String get securitySaveFailed => '无法保存权限。请确认此对话仍绑定了工作区。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -32523,6 +32555,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get toolApprovalDenyHint => '原因（可選）';
 
   @override
+  String get toolApprovalMoreOptions => '更多批准選項';
+
+  @override
+  String get toolApprovalScopeTitle => '批准';
+
+  @override
+  String get toolApprovalScopeOnce => '僅本次批准';
+
+  @override
+  String get toolApprovalScopeConversation => '在此對話中始終允許';
+
+  @override
+  String get toolApprovalScopeAlways => '始終允許';
+
+  @override
   String toolApprovalDeniedMessage(Object reason, Object toolName) {
     return '工具調用 \"$toolName\" 已被使用者拒絕。原因：$reason';
   }
@@ -36694,77 +36741,78 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允許此助手使用手機控制';
-  @override
-  String get securityPermissionsTitle => "工具權限";
 
   @override
-  String get securityModeRequest => "請求批准";
+  String get securityPermissionsTitle => '工具權限';
 
   @override
-  String get securityModeAuto => "按規則批准";
+  String get securityModeRequest => '請求批准';
 
   @override
-  String get securityModeFull => "完全存取";
+  String get securityModeAuto => '按規則批准';
 
   @override
-  String get securityModeRequestHint => "修改檔案、讀取外部檔案和執行命令前請求批准。";
+  String get securityModeFull => '完全存取';
 
   @override
-  String get securityModeAutoHint => "允許工作區內的檔案修改和您明確允許的規則。";
+  String get securityModeRequestHint => '修改檔案、讀取外部檔案和執行命令前請求批准。';
 
   @override
-  String get securityModeFullHint => "無需詢問即可執行工作區工具。命令可以存取您的使用者帳戶。";
+  String get securityModeAutoHint => '允許工作區內的檔案修改和您明確允許的規則。';
+
+  @override
+  String get securityModeFullHint => '無需詢問即可執行工作區工具。命令可以存取您的使用者帳戶。';
 
   @override
   String get securityIndependentLimits =>
-      "代理失敗時禁止自動直連。剪貼簿工具始終需要批准。唯讀掛載和檔案拒絕規則會阻止工作區命令工具。";
+      '代理失敗時禁止自動直連。除完全存取外，剪貼簿工具需要批准。唯讀掛載和檔案拒絕規則會阻止工作區命令工具。';
 
   @override
-  String get securityRulesTitle => "此對話的批准規則";
+  String get securityRulesTitle => '此對話的批准規則';
 
   @override
   String get securityRulesHint =>
-      "所有模式都優先執行拒絕規則。允許規則僅在規則模式中生效。檔案拒絕規則會阻止工作區命令工具。命令允許規則精確匹配完整命令和工作目錄；程式仍使用您的使用者權限。";
+      '所有模式都優先執行拒絕規則。允許規則僅在規則模式中生效。檔案拒絕規則會阻止工作區命令工具。命令允許規則精確匹配完整命令和工作目錄；程式仍使用您的使用者權限。';
 
   @override
-  String get securityRuleRead => "讀取檔案";
+  String get securityRuleRead => '讀取檔案';
 
   @override
-  String get securityRuleWrite => "寫入檔案";
+  String get securityRuleWrite => '寫入檔案';
 
   @override
-  String get securityRuleShell => "執行命令";
+  String get securityRuleShell => '執行命令';
 
   @override
-  String get securityRuleDeny => "拒絕";
+  String get securityRuleDeny => '拒絕';
 
   @override
-  String get securityRuleAllow => "按規則允許";
+  String get securityRuleAllow => '按規則允許';
 
   @override
-  String get securityRuleAction => "操作";
+  String get securityRuleAction => '操作';
 
   @override
-  String get securityRuleEffect => "決定";
+  String get securityRuleEffect => '決定';
 
   @override
-  String get securityRulePath => "主機絕對路徑（命令：工作目錄）";
+  String get securityRulePath => '主機絕對路徑（命令：工作目錄）';
 
   @override
-  String get securityRuleCommand => "完整命令";
+  String get securityRuleCommand => '完整命令';
 
   @override
-  String get securityRuleRecursive => "包含子資料夾";
+  String get securityRuleRecursive => '包含子資料夾';
 
   @override
-  String get securityRuleAdd => "新增規則";
+  String get securityRuleAdd => '新增規則';
 
   @override
-  String get securityRuleRemove => "刪除規則";
+  String get securityRuleRemove => '刪除規則';
 
   @override
-  String get securityRuleInvalid => "請輸入絕對路徑。命令規則還需要完整的命令。";
+  String get securityRuleInvalid => '請輸入絕對路徑。命令規則還需要完整的命令。';
 
   @override
-  String get securitySaveFailed => "無法儲存權限。請確認此對話仍綁定了工作區。";
+  String get securitySaveFailed => '無法儲存權限。請確認此對話仍綁定了工作區。';
 }

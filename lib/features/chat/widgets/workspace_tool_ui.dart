@@ -19,6 +19,7 @@ import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
@@ -349,6 +350,87 @@ class ToolApprovalButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Chevron beside an approve button that offers broader approval scopes
+/// (this conversation / always). Renders nothing when only "once" applies.
+class ToolApprovalScopeButton extends StatelessWidget {
+  const ToolApprovalScopeButton({
+    super.key,
+    required this.approvalService,
+    required this.request,
+    required this.color,
+  });
+
+  final ToolApprovalService approvalService;
+  final ToolApprovalRequest request;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!request.canGrantConversation && !request.canGrantAlways) {
+      return const SizedBox.shrink();
+    }
+    return IosIconButton(
+      size: 14,
+      padding: const EdgeInsets.all(7),
+      color: color,
+      semanticLabel: AppLocalizations.of(context)!.toolApprovalMoreOptions,
+      builder: (color) => Icon(Lucide.ChevronDown, size: 14, color: color),
+      onTap: () {
+        final box = context.findRenderObject() as RenderBox?;
+        final anchor = box == null
+            ? Offset.zero
+            : box.localToGlobal(box.size.bottomLeft(Offset.zero));
+        unawaited(
+          showToolApprovalScopeMenu(
+            context,
+            approvalService,
+            request,
+            anchor: anchor,
+          ),
+        );
+      },
+    );
+  }
+}
+
+Future<void> showToolApprovalScopeMenu(
+  BuildContext context,
+  ToolApprovalService approvalService,
+  ToolApprovalRequest request, {
+  required Offset anchor,
+}) {
+  final l10n = AppLocalizations.of(context)!;
+  void approve(ToolApprovalScope scope) => approvalService.approve(
+    request.toolCallId,
+    conversationId: request.conversationId,
+    scope: scope,
+  );
+  return showAdaptiveActionMenu(
+    context,
+    anchor: anchor,
+    title: l10n.toolApprovalScopeTitle,
+    items: [
+      ActionSheetItem(
+        icon: Lucide.Check,
+        label: l10n.toolApprovalScopeOnce,
+        onTap: () => approve(ToolApprovalScope.once),
+      ),
+      if (request.canGrantConversation)
+        ActionSheetItem(
+          icon: Lucide.MessageCircle,
+          label: l10n.toolApprovalScopeConversation,
+          onTap: () => approve(ToolApprovalScope.conversation),
+        ),
+      if (request.canGrantAlways)
+        ActionSheetItem(
+          icon: Lucide.Repeat,
+          label: l10n.toolApprovalScopeAlways,
+          onTap: () => approve(ToolApprovalScope.always),
+        ),
+    ],
+  );
 }
 
 void showToolApprovalDenyDialog(

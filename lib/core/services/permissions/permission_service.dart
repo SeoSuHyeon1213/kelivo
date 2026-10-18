@@ -35,7 +35,9 @@ class PermissionService {
     }
     if (action == PermissionAction.clipboardRead ||
         action == PermissionAction.clipboardWrite)
-      return PermissionDecision.requestApproval;
+      return mode == PermissionMode.fullAccess
+          ? PermissionDecision.allow
+          : PermissionDecision.requestApproval;
     if (action == PermissionAction.write && (readOnly || skills)) {
       return PermissionDecision.deny;
     }

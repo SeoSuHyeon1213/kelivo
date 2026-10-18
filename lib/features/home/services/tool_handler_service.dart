@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/model_spec.dart';
+import '../../../core/models/permission_mode.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
@@ -17,6 +18,7 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/tool_call_cancellation.dart';
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/services/permissions/permission_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
@@ -456,11 +458,29 @@ class ToolHandlerService {
             routeSnapshot: routes,
             reservedNames: BuiltInToolNames.all,
           )) {
+        final target = toolSvc.approvalTargetForAssistant(
+          mcp,
+          assistantProvider,
+          assistantId: assistant?.id,
+          toolName: name,
+          routeSnapshot: routes,
+          reservedNames: BuiltInToolNames.all,
+        );
         final result = await approvalService.requestApproval(
           toolCallId: approvalIdFor(name, toolCallId),
           toolName: name,
           arguments: args,
           conversationId: conversationId,
+          grantKey: target == null
+              ? null
+              : 'mcp:${target.serverId}:${target.toolName}',
+          persistGrant: target == null
+              ? null
+              : () => mcp.setToolNeedsApproval(
+                  target.serverId,
+                  target.toolName,
+                  false,
+                ),
         );
         if (!result.approved) {
           return _toolError(
@@ -540,6 +560,8 @@ class ToolHandlerService {
             toolName: name,
             arguments: args,
             conversationId: conversationId,
+            // These tools edit personal data, so grants never outlive the chat.
+            grantKey: 'local:$name',
           );
           if (!approval.approved) {
             return _toolError(
@@ -573,15 +595,40 @@ class ToolHandlerService {
           authorizeClipboard: () async {
             final cancellation = ToolCallCancellation.current;
             cancellation?.throwIfCancelled();
-            if (approvalService == null ||
-                !const {'read', 'write'}.contains(args['action']))
+            final action = args['action'];
+            if (!const {'read', 'write'}.contains(action)) return false;
+            bool clipboardStillEnabled() {
+              final current = assistant == null
+                  ? null
+                  : assistantProvider.getById(assistant.id);
+              return current != null &&
+                  current.localToolIds.contains(LocalToolNames.clipboard);
+            }
+
+            // A bound workspace in full-access mode also covers the clipboard.
+            final binding =
+                workspaceContext?.currentBinding?.call() ??
+                workspaceContext?.binding;
+            final decision = const PermissionService().decide(
+              mode: binding?.permissionMode ?? PermissionMode.requestApproval,
+              action: action == 'read'
+                  ? PermissionAction.clipboardRead
+                  : PermissionAction.clipboardWrite,
+            );
+            if (decision == PermissionDecision.allow) {
+              return clipboardStillEnabled();
+            }
+            if (decision == PermissionDecision.deny ||
+                approvalService == null) {
               return false;
+            }
             final id = approvalIdFor(name, toolCallId);
             final pending = approvalService.requestApproval(
               toolCallId: id,
               toolName: name,
               arguments: args,
               conversationId: conversationId,
+              grantKey: 'clipboard:$action',
             );
             final approval = cancellation == null
                 ? await pending
@@ -606,12 +653,7 @@ class ToolHandlerService {
                     }),
                   ]);
             cancellation?.throwIfCancelled();
-            final current = assistant == null
-                ? null
-                : assistantProvider.getById(assistant.id);
-            return approval.approved &&
-                current != null &&
-                current.localToolIds.contains(LocalToolNames.clipboard);
+            return approval.approved && clipboardStillEnabled();
           },
           onSpeakText: (text) async {
             final tts = contextProvider.read<TtsProvider>();

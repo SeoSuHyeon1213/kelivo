@@ -8388,6 +8388,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolApprovalDenyHint => 'Reason (optional)';
 
   @override
+  String get toolApprovalMoreOptions => 'More approval options';
+
+  @override
+  String get toolApprovalScopeTitle => 'Approve';
+
+  @override
+  String get toolApprovalScopeOnce => 'Approve once';
+
+  @override
+  String get toolApprovalScopeConversation => 'Allow for this chat';
+
+  @override
+  String get toolApprovalScopeAlways => 'Always allow';
+
+  @override
   String toolApprovalDeniedMessage(Object reason, Object toolName) {
     return 'Tool call \"$toolName\" was denied by user. Reason: $reason';
   }
@@ -12787,83 +12802,84 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get phoneControlEnableAssistant =>
       'Allow this assistant to use phone control';
-  @override
-  String get securityPermissionsTitle => "Tool permissions";
 
   @override
-  String get securityModeRequest => "Request approval";
+  String get securityPermissionsTitle => 'Tool permissions';
 
   @override
-  String get securityModeAuto => "Approve by policy";
+  String get securityModeRequest => 'Request approval';
 
   @override
-  String get securityModeFull => "Full access";
+  String get securityModeAuto => 'Approve by policy';
+
+  @override
+  String get securityModeFull => 'Full access';
 
   @override
   String get securityModeRequestHint =>
-      "Ask before file changes, outside reads, and shell commands.";
+      'Ask before file changes, outside reads, and shell commands.';
 
   @override
   String get securityModeAutoHint =>
-      "Allow internal file changes and your explicit allow rules.";
+      'Allow internal file changes and your explicit allow rules.';
 
   @override
   String get securityModeFullHint =>
-      "Run workspace tools without asking. Commands can access your user account.";
+      'Run workspace tools without asking. Commands can access your user account.';
 
   @override
   String get securityIndependentLimits =>
-      "Proxy fallback to a direct connection is blocked. The clipboard tool always asks. Read-only mounts and file deny rules block the workspace shell.";
+      'Proxy fallback to a direct connection is blocked. The clipboard tool asks unless full access is on. Read-only mounts and file deny rules block the workspace shell.';
 
   @override
-  String get securityRulesTitle => "Approval rules for this conversation";
+  String get securityRulesTitle => 'Approval rules for this conversation';
 
   @override
   String get securityRulesHint =>
-      "Deny takes priority in every mode. Allow rules apply in policy mode. File deny rules block the workspace shell. Shell allow rules match the complete command and working directory; programs still run with your user permissions.";
+      'Deny takes priority in every mode. Allow rules apply in policy mode. File deny rules block the workspace shell. Shell allow rules match the complete command and working directory; programs still run with your user permissions.';
 
   @override
-  String get securityRuleRead => "Read files";
+  String get securityRuleRead => 'Read files';
 
   @override
-  String get securityRuleWrite => "Write files";
+  String get securityRuleWrite => 'Write files';
 
   @override
-  String get securityRuleShell => "Run shell";
+  String get securityRuleShell => 'Run shell';
 
   @override
-  String get securityRuleDeny => "Deny";
+  String get securityRuleDeny => 'Deny';
 
   @override
-  String get securityRuleAllow => "Allow by policy";
+  String get securityRuleAllow => 'Allow by policy';
 
   @override
-  String get securityRuleAction => "Operation";
+  String get securityRuleAction => 'Operation';
 
   @override
-  String get securityRuleEffect => "Decision";
+  String get securityRuleEffect => 'Decision';
 
   @override
   String get securityRulePath =>
-      "Absolute host path (shell: working directory)";
+      'Absolute host path (shell: working directory)';
 
   @override
-  String get securityRuleCommand => "Exact shell command";
+  String get securityRuleCommand => 'Exact shell command';
 
   @override
-  String get securityRuleRecursive => "Include subfolders";
+  String get securityRuleRecursive => 'Include subfolders';
 
   @override
-  String get securityRuleAdd => "Add rule";
+  String get securityRuleAdd => 'Add rule';
 
   @override
-  String get securityRuleRemove => "Remove rule";
+  String get securityRuleRemove => 'Remove rule';
 
   @override
   String get securityRuleInvalid =>
-      "Enter an absolute path. Shell rules also require a complete command.";
+      'Enter an absolute path. Shell rules also require a complete command.';
 
   @override
   String get securitySaveFailed =>
-      "Could not save permissions. Check that this conversation is still bound to a workspace.";
+      'Could not save permissions. Check that this conversation is still bound to a workspace.';
 }

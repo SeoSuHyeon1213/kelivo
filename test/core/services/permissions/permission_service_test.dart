@@ -102,6 +102,26 @@ void main() {
     },
   );
 
+  test('clipboard asks unless the conversation has full access', () {
+    for (final action in [
+      PermissionAction.clipboardRead,
+      PermissionAction.clipboardWrite,
+    ]) {
+      expect(
+        policy.decide(mode: PermissionMode.requestApproval, action: action),
+        PermissionDecision.requestApproval,
+      );
+      expect(
+        policy.decide(mode: PermissionMode.policyAuto, action: action),
+        PermissionDecision.requestApproval,
+      );
+      expect(
+        policy.decide(mode: PermissionMode.fullAccess, action: action),
+        PermissionDecision.allow,
+      );
+    }
+  });
+
   test('explicit full access permits outside file operations', () {
     for (final action in [
       PermissionAction.read,

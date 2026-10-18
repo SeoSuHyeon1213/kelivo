@@ -565,9 +565,82 @@ void main() {
     expect(find.byKey(WorkspaceStatusBadge.approvalKey), findsOneWidget);
     expect(find.bySemanticsLabel('Deny'), findsOneWidget);
     expect(find.bySemanticsLabel('Approve'), findsOneWidget);
-    expect(find.text('Allow all this session'), findsOneWidget);
+    expect(find.text('Full access'), findsOneWidget);
     expect(find.text('ls'), findsWidgets);
     expect(find.byIcon(Lucide.Terminal), findsWidgets);
+  });
+
+  testWidgets('scope menu approves the call for the rest of the chat', (
+    tester,
+  ) async {
+    final approval = ToolApprovalService();
+    final first = approval.requestApproval(
+      toolCallId: 'pending-scope',
+      toolName: 'shell',
+      arguments: const {'command': 'ls'},
+      conversationId: 'c1',
+      grantKey: 'workspace:shell:/work ls',
+    );
+    await tester.pumpWidget(
+      _harness(
+        approval: approval,
+        toolParts: [
+          const ToolUIPart(
+            id: 'pending-scope',
+            toolName: 'shell',
+            arguments: {'command': 'ls'},
+            loading: true,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+
+    // Pending cards animate a loading indicator, so pumpAndSettle never ends.
+    await tester.tap(find.bySemanticsLabel('More approval options'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Approve once'), findsOneWidget);
+    expect(find.text('Always allow'), findsNothing);
+    await tester.tap(find.text('Allow for this chat'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect((await first).approved, isTrue);
+    expect(
+      approval.hasConversationGrant('c1', 'workspace:shell:/work ls'),
+      isTrue,
+    );
+  });
+
+  testWidgets('scope menu is hidden when only one-time approval applies', (
+    tester,
+  ) async {
+    final approval = ToolApprovalService();
+    unawaited(
+      approval.requestApproval(
+        toolCallId: 'pending-once',
+        toolName: 'shell',
+        arguments: const {'command': 'ls'},
+        conversationId: 'c1',
+      ),
+    );
+    await tester.pumpWidget(
+      _harness(
+        approval: approval,
+        toolParts: [
+          const ToolUIPart(
+            id: 'pending-once',
+            toolName: 'shell',
+            arguments: {'command': 'ls'},
+            loading: true,
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(find.bySemanticsLabel('More approval options'), findsNothing);
+    approval.cancelAll();
   });
 
   testWidgets('deny dialog contains IosFormTextField', (tester) async {

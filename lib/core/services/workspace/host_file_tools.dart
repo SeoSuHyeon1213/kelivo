@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'edit_matchers.dart';
 import 'unified_diff.dart';
 import 'workspace_paths.dart';
+import 'workspace_runtime.dart' show WorkspaceZone;
 import '../../models/external_mount.dart';
 
 class HostFileException implements Exception {

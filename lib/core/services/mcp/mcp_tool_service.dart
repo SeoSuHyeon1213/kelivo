@@ -230,6 +230,38 @@ class McpToolService extends ChangeNotifier {
     return route?.tool.needsApproval ?? true;
   }
 
+  /// The configured server/tool behind an exposed [toolName], used to scope
+  /// approval grants and to clear the tool's `needsApproval` flag.
+  ({String serverId, String toolName})? approvalTargetForAssistant(
+    McpProvider mcpProvider,
+    AssistantProvider assistants, {
+    required String? assistantId,
+    required String toolName,
+    McpToolRouteSnapshot? routeSnapshot,
+    Set<String> reservedNames = const {},
+  }) {
+    final assistant = assistantId != null
+        ? assistants.getById(assistantId)
+        : assistants.currentAssistant;
+    final selected = (assistant?.mcpServerIds ?? const <String>[]).toSet();
+    final publishedRoute = routeSnapshot != null
+        ? routeSnapshot._find(toolName)
+        : _findRoute(
+            mcpProvider,
+            selected,
+            toolName,
+            reservedNames: reservedNames,
+          );
+    if (publishedRoute == null) return null;
+    final route = _currentRouteForIdentity(
+      mcpProvider,
+      selected,
+      publishedRoute,
+    );
+    if (route == null) return null;
+    return (serverId: route.server.id, toolName: route.tool.name);
+  }
+
   McpToolRouteSnapshot captureRoutesForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {

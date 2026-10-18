@@ -1,4 +1,5 @@
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> expectStillPending(Future<dynamic> future) async {
@@ -122,13 +123,14 @@ void main() {
       final first = service.requestApproval(
         toolCallId: 'round-0:tool-1',
         toolName: 'lookup',
-        arguments: const {'q': 'first'},
+        arguments: const {'q': 'same'},
         conversationId: 'conversation-a',
       );
+      // A retry with identical arguments shares the pending card.
       final second = service.requestApproval(
         toolCallId: 'round-0:tool-1',
         toolName: 'lookup',
-        arguments: const {'q': 'second'},
+        arguments: const {'q': 'same'},
         conversationId: 'conversation-a',
       );
 
@@ -159,6 +161,196 @@ void main() {
     service.cancelAll();
     expect((await first).approved, isFalse);
     expect((await second).approved, isFalse);
+  });
+
+  group('approval scopes', () {
+    test('once does not grant later calls', () async {
+      final service = ToolApprovalService();
+      addTearDown(service.dispose);
+      final first = service.requestApproval(
+        toolCallId: 'a',
+        toolName: 'lookup',
+        arguments: const {},
+        conversationId: 'chat',
+        grantKey: 'mcp:server:lookup',
+      );
+      service.approve('a', conversationId: 'chat');
+      expect((await first).approved, isTrue);
+      final second = service.requestApproval(
+        toolCallId: 'b',
+        toolName: 'lookup',
+        arguments: const {},
+        conversationId: 'chat',
+        grantKey: 'mcp:server:lookup',
+      );
+      await expectStillPending(second);
+      expect(service.hasPending, isTrue);
+    });
+
+    test(
+      'conversation grant auto-approves the same key in that chat only',
+      () async {
+        final service = ToolApprovalService();
+        addTearDown(service.dispose);
+        final first = service.requestApproval(
+          toolCallId: 'a',
+          toolName: 'lookup',
+          arguments: const {},
+          conversationId: 'chat',
+          grantKey: 'mcp:server:lookup',
+        );
+        // A parallel call with the same key is released by the grant too.
+        final parallel = service.requestApproval(
+          toolCallId: 'b',
+          toolName: 'lookup',
+          arguments: const {'q': 'other'},
+          conversationId: 'chat',
+          grantKey: 'mcp:server:lookup',
+        );
+        final otherKey = service.requestApproval(
+          toolCallId: 'c',
+          toolName: 'write',
+          arguments: const {},
+          conversationId: 'chat',
+          grantKey: 'mcp:server:write',
+        );
+        service.approve(
+          'a',
+          conversationId: 'chat',
+          scope: ToolApprovalScope.conversation,
+        );
+        expect((await first).approved, isTrue);
+        expect((await parallel).approved, isTrue);
+        await expectStillPending(otherKey);
+
+        final later = await service.requestApproval(
+          toolCallId: 'd',
+          toolName: 'lookup',
+          arguments: const {},
+          conversationId: 'chat',
+          grantKey: 'mcp:server:lookup',
+        );
+        expect(later.approved, isTrue);
+
+        final otherChat = service.requestApproval(
+          toolCallId: 'e',
+          toolName: 'lookup',
+          arguments: const {},
+          conversationId: 'other-chat',
+          grantKey: 'mcp:server:lookup',
+        );
+        await expectStillPending(otherChat);
+
+        service.clearConversationGrants('chat');
+        final afterClear = service.requestApproval(
+          toolCallId: 'f',
+          toolName: 'lookup',
+          arguments: const {},
+          conversationId: 'chat',
+          grantKey: 'mcp:server:lookup',
+        );
+        await expectStillPending(afterClear);
+        service.cancelAll();
+      },
+    );
+
+    test('requests without a key or conversation fall back to once', () async {
+      final service = ToolApprovalService();
+      addTearDown(service.dispose);
+      final keyless = service.requestApproval(
+        toolCallId: 'a',
+        toolName: 'lookup',
+        arguments: const {},
+        conversationId: 'chat',
+      );
+      expect(service.pendingRequests.single.canGrantConversation, isFalse);
+      service.approve(
+        'a',
+        conversationId: 'chat',
+        scope: ToolApprovalScope.conversation,
+      );
+      expect((await keyless).approved, isTrue);
+
+      final unscoped = service.requestApproval(
+        toolCallId: 'b',
+        toolName: 'lookup',
+        arguments: const {},
+        grantKey: 'mcp:server:lookup',
+      );
+      expect(service.pendingRequests.single.canGrantConversation, isFalse);
+      service.approve('b', scope: ToolApprovalScope.conversation);
+      expect((await unscoped).approved, isTrue);
+      expect(service.hasConversationGrant('chat', 'mcp:server:lookup'), isFalse);
+    });
+
+    test('always persists once and also grants the conversation', () async {
+      final service = ToolApprovalService();
+      addTearDown(service.dispose);
+      var persisted = 0;
+      final first = service.requestApproval(
+        toolCallId: 'a',
+        toolName: 'lookup',
+        arguments: const {},
+        conversationId: 'chat',
+        grantKey: 'mcp:server:lookup',
+        persistGrant: () async => persisted++,
+      );
+      expect(service.pendingRequests.single.canGrantAlways, isTrue);
+      service.approve(
+        'a',
+        conversationId: 'chat',
+        scope: ToolApprovalScope.always,
+      );
+      expect((await first).approved, isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(persisted, 1);
+      expect(service.hasConversationGrant('chat', 'mcp:server:lookup'), isTrue);
+    });
+
+    test('always without a persister only approves once', () async {
+      final service = ToolApprovalService();
+      addTearDown(service.dispose);
+      final first = service.requestApproval(
+        toolCallId: 'a',
+        toolName: 'clipboard',
+        arguments: const {},
+        conversationId: 'chat',
+        grantKey: 'clipboard:read',
+      );
+      expect(service.pendingRequests.single.canGrantAlways, isFalse);
+      service.approve(
+        'a',
+        conversationId: 'chat',
+        scope: ToolApprovalScope.always,
+      );
+      expect((await first).approved, isTrue);
+      expect(service.hasConversationGrant('chat', 'clipboard:read'), isFalse);
+    });
+
+    test('a failing persister still approves the current call', () async {
+      final service = ToolApprovalService();
+      addTearDown(service.dispose);
+      final errors = <FlutterErrorDetails>[];
+      final previous = FlutterError.onError;
+      FlutterError.onError = errors.add;
+      addTearDown(() => FlutterError.onError = previous);
+      final first = service.requestApproval(
+        toolCallId: 'a',
+        toolName: 'lookup',
+        arguments: const {},
+        conversationId: 'chat',
+        grantKey: 'mcp:server:lookup',
+        persistGrant: () async => throw StateError('disk full'),
+      );
+      service.approve(
+        'a',
+        conversationId: 'chat',
+        scope: ToolApprovalScope.always,
+      );
+      expect((await first).approved, isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(errors, hasLength(1));
+    });
   });
 
   test('cancelForConversation leaves the other chat waiting', () async {

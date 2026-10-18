@@ -15,6 +15,18 @@ class ToolApprovalResult {
       ToolApprovalResult(approved: false, denyReason: reason);
 }
 
+/// How far a user's approval reaches beyond the current call.
+enum ToolApprovalScope {
+  /// Only this tool call.
+  once,
+
+  /// Matching calls in the same conversation until the app restarts.
+  conversation,
+
+  /// Persisted by the caller (MCP tool flag, workspace allow rule, ...).
+  always,
+}
+
 typedef _PendingKey = ({String scope, String toolCallId});
 
 Object? _freezeArguments(Object? value) {
@@ -35,6 +47,11 @@ class ToolApprovalRequest {
   final String toolName;
   final Map<String, dynamic> arguments;
   final String? conversationId;
+
+  /// Identifies the exact capability being granted (e.g. `mcp:<tool>` or
+  /// `shell:<cwd>\u0000<command>`). Null disables broader approval scopes.
+  final String? grantKey;
+  final Future<void> Function()? _persistGrant;
   final Completer<ToolApprovalResult> _completer;
 
   ToolApprovalRequest({
@@ -42,10 +59,24 @@ class ToolApprovalRequest {
     required this.toolName,
     required this.arguments,
     this.conversationId,
+    this.grantKey,
+    this._persistGrant,
     required this._completer,
   });
 
   Future<ToolApprovalResult> get future => _completer.future;
+
+  /// Whether "allow for this conversation" can be offered.
+  bool get canGrantConversation => grantKey != null && conversationId != null;
+
+  /// Whether "always allow" can be offered.
+  bool get canGrantAlways => _persistGrant != null;
+
+  bool supports(ToolApprovalScope scope) => switch (scope) {
+    ToolApprovalScope.once => true,
+    ToolApprovalScope.conversation => canGrantConversation,
+    ToolApprovalScope.always => canGrantAlways,
+  };
 }
 
 /// Manages approval state for MCP tool calls that require user confirmation.
@@ -60,9 +91,25 @@ class ToolApprovalRequest {
 ///
 /// Storage is keyed by `(conversationId, toolCallId)` so two chats that share a
 /// placeholder id such as `round-0:tool-1` keep independent Completers.
+///
+/// A request created with a [ToolApprovalRequest.grantKey] can also be approved
+/// for the rest of its conversation; later requests with the same key in that
+/// conversation then resolve immediately without showing a card.
 class ToolApprovalService extends ChangeNotifier {
   final Map<_PendingKey, ToolApprovalRequest> _pending = {};
+  final Map<String, Set<String>> _conversationGrants = {};
   int _unscopedSeq = 0;
+
+  /// Whether [grantKey] was approved for the rest of [conversationId].
+  bool hasConversationGrant(String conversationId, String grantKey) =>
+      _conversationGrants[conversationId.trim()]?.contains(grantKey) ?? false;
+
+  /// Revoke every conversation-scoped grant for [conversationId].
+  void clearConversationGrants(String conversationId) {
+    if (_conversationGrants.remove(conversationId.trim()) != null) {
+      notifyListeners();
+    }
+  }
 
   /// Unmodifiable snapshot of pending approval requests.
   List<ToolApprovalRequest> get pendingRequests =>
@@ -111,12 +158,23 @@ class ToolApprovalService extends ChangeNotifier {
   ///
   /// New requests should pass [conversationId]. A null conversation is stored
   /// under a unique unscoped key so two chats cannot overwrite each other.
+  ///
+  /// [grantKey] enables "allow for this conversation"; [persistGrant] enables
+  /// "always allow" and is invoked once when the user picks that scope.
   Future<ToolApprovalResult> requestApproval({
     required String toolCallId,
     required String toolName,
     required Map<String, dynamic> arguments,
     String? conversationId,
+    String? grantKey,
+    Future<void> Function()? persistGrant,
   }) {
+    final storedConversation = _storedConversationId(conversationId);
+    if (storedConversation != null &&
+        grantKey != null &&
+        hasConversationGrant(storedConversation, grantKey)) {
+      return Future.value(ToolApprovalResult.approved());
+    }
     final key = _storageKey(conversationId, toolCallId);
     final existing = _pending[key];
     if (existing != null) {
@@ -135,7 +193,9 @@ class ToolApprovalService extends ChangeNotifier {
       arguments:
           _freezeArguments(jsonDecode(jsonEncode(arguments)))
               as Map<String, dynamic>,
-      conversationId: _storedConversationId(conversationId),
+      conversationId: storedConversation,
+      grantKey: grantKey,
+      persistGrant: persistGrant,
       completer: completer,
     );
     notifyListeners();
@@ -143,7 +203,15 @@ class ToolApprovalService extends ChangeNotifier {
   }
 
   /// Approve a pending tool call.
-  void approve(String toolCallId, {String? conversationId}) {
+  ///
+  /// A [scope] the request does not support falls back to [ToolApprovalScope.once].
+  /// Broader scopes also release other pending calls with the same grant key in
+  /// the same conversation.
+  void approve(
+    String toolCallId, {
+    String? conversationId,
+    ToolApprovalScope scope = ToolApprovalScope.once,
+  }) {
     final req = _takePending(
       toolCallId: toolCallId,
       conversationId: conversationId,
@@ -151,7 +219,48 @@ class ToolApprovalService extends ChangeNotifier {
     if (req != null && !req._completer.isCompleted) {
       req._completer.complete(ToolApprovalResult.approved());
     }
+    if (req != null && scope != ToolApprovalScope.once && req.supports(scope)) {
+      if (req.canGrantConversation) {
+        _grantConversation(req.conversationId!, req.grantKey!);
+      }
+      if (scope == ToolApprovalScope.always) {
+        unawaited(_persist(req));
+      }
+    }
     notifyListeners();
+  }
+
+  void _grantConversation(String conversationId, String grantKey) {
+    (_conversationGrants[conversationId] ??= <String>{}).add(grantKey);
+    final released = _pending.entries
+        .where(
+          (entry) =>
+              entry.value.conversationId == conversationId &&
+              entry.value.grantKey == grantKey,
+        )
+        .toList();
+    for (final entry in released) {
+      _pending.remove(entry.key);
+      if (!entry.value._completer.isCompleted) {
+        entry.value._completer.complete(ToolApprovalResult.approved());
+      }
+    }
+  }
+
+  Future<void> _persist(ToolApprovalRequest req) async {
+    try {
+      await req._persistGrant!();
+    } catch (error, stack) {
+      // The current call is already approved; only the saved grant failed.
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'Kelivo tool approval',
+          context: ErrorDescription('while saving an always-allow grant'),
+        ),
+      );
+    }
   }
 
   /// Deny a pending tool call with an optional reason.

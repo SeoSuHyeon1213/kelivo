@@ -104,31 +104,6 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Search settings'**
-  String get securityPermissionsTitle;
-  String get securityModeRequest;
-  String get securityModeAuto;
-  String get securityModeFull;
-  String get securityModeRequestHint;
-  String get securityModeAutoHint;
-  String get securityModeFullHint;
-  String get securityIndependentLimits;
-  String get securityRulesTitle;
-  String get securityRulesHint;
-  String get securityRuleRead;
-  String get securityRuleWrite;
-  String get securityRuleShell;
-  String get securityRuleDeny;
-  String get securityRuleAllow;
-  String get securityRuleAction;
-  String get securityRuleEffect;
-  String get securityRulePath;
-  String get securityRuleCommand;
-  String get securityRuleRecursive;
-  String get securityRuleAdd;
-  String get securityRuleRemove;
-  String get securityRuleInvalid;
-  String get securitySaveFailed;
-
   String get settingsSearchHint;
 
   /// No description provided for @settingsSearchCancel.
@@ -15260,6 +15235,36 @@ abstract class AppLocalizations {
   /// **'Reason (optional)'**
   String get toolApprovalDenyHint;
 
+  /// No description provided for @toolApprovalMoreOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'More approval options'**
+  String get toolApprovalMoreOptions;
+
+  /// No description provided for @toolApprovalScopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get toolApprovalScopeTitle;
+
+  /// No description provided for @toolApprovalScopeOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve once'**
+  String get toolApprovalScopeOnce;
+
+  /// No description provided for @toolApprovalScopeConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow for this chat'**
+  String get toolApprovalScopeConversation;
+
+  /// No description provided for @toolApprovalScopeAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always allow'**
+  String get toolApprovalScopeAlways;
+
   /// No description provided for @toolApprovalDeniedMessage.
   ///
   /// In en, this message translates to:
@@ -22866,6 +22871,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow this assistant to use phone control'**
   String get phoneControlEnableAssistant;
+
+  /// No description provided for @securityPermissionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool permissions'**
+  String get securityPermissionsTitle;
+
+  /// No description provided for @securityModeRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Request approval'**
+  String get securityModeRequest;
+
+  /// No description provided for @securityModeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve by policy'**
+  String get securityModeAuto;
+
+  /// No description provided for @securityModeFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Full access'**
+  String get securityModeFull;
+
+  /// No description provided for @securityModeRequestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask before file changes, outside reads, and shell commands.'**
+  String get securityModeRequestHint;
+
+  /// No description provided for @securityModeAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow internal file changes and your explicit allow rules.'**
+  String get securityModeAutoHint;
+
+  /// No description provided for @securityModeFullHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Run workspace tools without asking. Commands can access your user account.'**
+  String get securityModeFullHint;
+
+  /// No description provided for @securityIndependentLimits.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy fallback to a direct connection is blocked. The clipboard tool asks unless full access is on. Read-only mounts and file deny rules block the workspace shell.'**
+  String get securityIndependentLimits;
+
+  /// No description provided for @securityRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval rules for this conversation'**
+  String get securityRulesTitle;
+
+  /// No description provided for @securityRulesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny takes priority in every mode. Allow rules apply in policy mode. File deny rules block the workspace shell. Shell allow rules match the complete command and working directory; programs still run with your user permissions.'**
+  String get securityRulesHint;
+
+  /// No description provided for @securityRuleRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read files'**
+  String get securityRuleRead;
+
+  /// No description provided for @securityRuleWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Write files'**
+  String get securityRuleWrite;
+
+  /// No description provided for @securityRuleShell.
+  ///
+  /// In en, this message translates to:
+  /// **'Run shell'**
+  String get securityRuleShell;
+
+  /// No description provided for @securityRuleDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get securityRuleDeny;
+
+  /// No description provided for @securityRuleAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow by policy'**
+  String get securityRuleAllow;
+
+  /// No description provided for @securityRuleAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation'**
+  String get securityRuleAction;
+
+  /// No description provided for @securityRuleEffect.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision'**
+  String get securityRuleEffect;
+
+  /// No description provided for @securityRulePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Absolute host path (shell: working directory)'**
+  String get securityRulePath;
+
+  /// No description provided for @securityRuleCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact shell command'**
+  String get securityRuleCommand;
+
+  /// No description provided for @securityRuleRecursive.
+  ///
+  /// In en, this message translates to:
+  /// **'Include subfolders'**
+  String get securityRuleRecursive;
+
+  /// No description provided for @securityRuleAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add rule'**
+  String get securityRuleAdd;
+
+  /// No description provided for @securityRuleRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove rule'**
+  String get securityRuleRemove;
+
+  /// No description provided for @securityRuleInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an absolute path. Shell rules also require a complete command.'**
+  String get securityRuleInvalid;
+
+  /// No description provided for @securitySaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save permissions. Check that this conversation is still bound to a workspace.'**
+  String get securitySaveFailed;
 }
 
 class _AppLocalizationsDelegate

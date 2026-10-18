@@ -13,6 +13,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
 import '../../models/workspace_binding.dart';
 import '../../models/permission_mode.dart';
+import '../../models/permission_rule.dart';
 import '../permissions/permission_service.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
@@ -750,6 +751,12 @@ class WorkspaceToolsService {
       toolName: tool,
       args: {...args, 'resolved_cwd': resolvedCwd.hostPath},
       conversationId: conversationId ?? ctx.conversationId,
+      grantKey: 'workspace:shell:${resolvedCwd.hostPath}\u0000$command',
+      persistGrant: _allowRulePersister(ctx, conversationId, {
+        'action': PermissionRuleAction.shell.name,
+        'path': resolvedCwd.hostPath,
+        'command': command,
+      }),
     );
     if (denied != null) return denied;
     ToolCallCancellation.current?.throwIfCancelled();
@@ -1521,6 +1528,9 @@ class WorkspaceToolsService {
       );
     }
     final approved = decision == PermissionDecision.requestApproval;
+    final ruleAction = writes
+        ? PermissionRuleAction.write
+        : PermissionRuleAction.read;
     final denied = await _maybeApprove(
       approvalService,
       needed: approved,
@@ -1529,6 +1539,18 @@ class WorkspaceToolsService {
       args: {...args, if (resolved != null) 'resolved_path': resolved.hostPath},
       conversationId: conversationId,
       path: resolved?.modelPath,
+      // Directory tools were approved for the whole subtree (see guard below).
+      grantKey: resolved == null
+          ? null
+          : 'workspace:${ruleAction.name}${directoryTool ? '-tree' : ''}:'
+                '${resolved.hostPath}',
+      persistGrant: resolved == null
+          ? null
+          : _allowRulePersister(ctx, conversationId, {
+              'action': ruleAction.name,
+              'path': resolved.hostPath,
+              'recursive': directoryTool,
+            }),
     );
     if (denied != null) return (ctx, denied);
     final approvedMode = _mode(ctx);
@@ -1598,6 +1620,57 @@ class WorkspaceToolsService {
     return null;
   }
 
+  /// Builds the "always allow" action for an approval card, or null when a
+  /// saved allow rule would have no effect or cannot be stored.
+  ///
+  /// Allow rules only apply in [PermissionMode.policyAuto], so other modes only
+  /// offer once / per-conversation approval.
+  Future<void> Function()? _allowRulePersister(
+    WorkspaceToolContext ctx,
+    String? conversationId,
+    Map<String, dynamic> ruleJson,
+  ) {
+    final id = conversationId ?? ctx.conversationId;
+    final update = updateConversationExtras;
+    if (ctx.skillsOnly ||
+        update == null ||
+        id == null ||
+        id.isEmpty ||
+        _mode(ctx) != PermissionMode.policyAuto) {
+      return null;
+    }
+    final PermissionRule rule;
+    try {
+      rule = PermissionRule.fromJson({
+        'id': const Uuid().v4(),
+        'effect': PermissionRuleEffect.allow.name,
+        ...ruleJson,
+      });
+    } on FormatException {
+      return null;
+    }
+    return () => update(id, (extras) {
+      final current = WorkspaceBinding.fromExtras(extras);
+      if (current.workspaceId != ctx.binding.workspaceId) return extras;
+      final duplicate = current.permissionRules.any(
+        (existing) =>
+            existing.effect == rule.effect &&
+            existing.action == rule.action &&
+            existing.path == rule.path &&
+            existing.recursive == rule.recursive &&
+            existing.command == rule.command,
+      );
+      if (duplicate) return extras;
+      return WorkspaceBinding(
+        workspaceId: current.workspaceId,
+        cwd: current.cwd,
+        toolsUsed: current.toolsUsed,
+        permissionMode: current.permissionMode,
+        permissionRules: List.unmodifiable([...current.permissionRules, rule]),
+      ).applyTo(extras);
+    });
+  }
+
   Future<Object?> _maybeApprove(
     ToolApprovalService? approvalService, {
     required bool needed,
@@ -1606,6 +1679,8 @@ class WorkspaceToolsService {
     required Map<String, dynamic> args,
     String? conversationId,
     String? path,
+    String? grantKey,
+    Future<void> Function()? persistGrant,
   }) async {
     ToolCallCancellation.current?.throwIfCancelled();
     if (!needed) return null;
@@ -1625,6 +1700,8 @@ class WorkspaceToolsService {
       toolName: toolName,
       arguments: Map<String, dynamic>.from(jsonDecode(jsonEncode(args)) as Map),
       conversationId: conversationId,
+      grantKey: grantKey,
+      persistGrant: persistGrant,
     );
     final cancellation = ToolCallCancellation.current;
     final result = cancellation == null

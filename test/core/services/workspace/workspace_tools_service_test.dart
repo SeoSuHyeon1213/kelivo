@@ -30,6 +30,8 @@ class _RecordingApproval extends ToolApprovalService {
     required String toolName,
     required Map<String, dynamic> arguments,
     String? conversationId,
+    String? grantKey,
+    Future<void> Function()? persistGrant,
   }) async {
     calls++;
     lastName = toolName;

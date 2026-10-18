@@ -76,9 +76,13 @@ void main() {
     )..then((_) => done = true);
     await waiting(approval);
     expect(done, isFalse);
+    // Windows normalizes host paths to lower case.
     expect(
-      approval.pendingRequests.single.arguments['resolved_path'],
-      outside.resolveSymbolicLinksSync(),
+      p.equals(
+        approval.pendingRequests.single.arguments['resolved_path'] as String,
+        outside.resolveSymbolicLinksSync(),
+      ),
+      isTrue,
     );
     approval.deny('read', conversationId: 'chat');
     final result = content(await pending);
@@ -212,4 +216,101 @@ void main() {
       expect(approval.hasPending, isFalse);
     },
   );
+  test('conversation approval covers repeat reads of the same file', () async {
+    final approval = ToolApprovalService();
+    final tools = WorkspaceToolsService();
+    final first = tools.handle(
+      context(),
+      'read_file',
+      {'path': outside.path},
+      toolCallId: 'read-1',
+      approvalService: approval,
+    );
+    await waiting(approval);
+    final card = approval.pendingRequests.single;
+    expect(card.canGrantConversation, isTrue);
+    // Allow rules are ignored in request mode, so "always" is not offered.
+    expect(card.canGrantAlways, isFalse);
+    approval.approve(
+      'read-1',
+      conversationId: 'chat',
+      scope: ToolApprovalScope.conversation,
+    );
+    expect(content(await first), contains('PRIVATE_SENTINEL'));
+
+    final repeat = await tools.handle(
+      context(),
+      'read_file',
+      {'path': outside.path},
+      toolCallId: 'read-2',
+      approvalService: approval,
+    );
+    expect(content(repeat), contains('PRIVATE_SENTINEL'));
+    expect(approval.hasPending, isFalse);
+
+    // A different file still needs its own approval.
+    final other = File(p.join(temp.path, 'other.txt'))
+      ..writeAsStringSync('OTHER_SENTINEL');
+    final pending = tools.handle(
+      context(),
+      'read_file',
+      {'path': other.path},
+      toolCallId: 'read-3',
+      approvalService: approval,
+    );
+    await waiting(approval);
+    approval.deny('read-3', conversationId: 'chat');
+    expect(content(await pending), isNot(contains('OTHER_SENTINEL')));
+  });
+
+  test('always approval in policy mode saves an exact allow rule', () async {
+    var extras = WorkspaceBinding(
+      workspaceId: 'ws',
+      permissionMode: PermissionMode.policyAuto,
+    ).applyTo(<String, dynamic>{});
+    final tools = WorkspaceToolsService(
+      updateConversationExtras: (id, update) async {
+        expect(id, 'chat');
+        extras = update(Map<String, dynamic>.of(extras));
+      },
+    );
+    WorkspaceToolContext ctx() => context(
+      mode: PermissionMode.policyAuto,
+      currentBinding: () => WorkspaceBinding.fromExtras(extras),
+    );
+    final approval = ToolApprovalService();
+    final first = tools.handle(
+      ctx(),
+      'read_file',
+      {'path': outside.path},
+      toolCallId: 'read-1',
+      approvalService: approval,
+    );
+    await waiting(approval);
+    expect(approval.pendingRequests.single.canGrantAlways, isTrue);
+    approval.approve(
+      'read-1',
+      conversationId: 'chat',
+      scope: ToolApprovalScope.always,
+    );
+    expect(content(await first), contains('PRIVATE_SENTINEL'));
+    await Future<void>.delayed(Duration.zero);
+
+    final rules = WorkspaceBinding.fromExtras(extras).permissionRules;
+    expect(rules, hasLength(1));
+    expect(p.equals(rules.single.path, outside.resolveSymbolicLinksSync()), isTrue);
+    expect(rules.single.recursive, isFalse);
+
+    // A fresh approval service (e.g. after restart) relies on the saved rule.
+    final restarted = ToolApprovalService();
+    final repeat = await tools.handle(
+      ctx(),
+      'read_file',
+      {'path': outside.path},
+      toolCallId: 'read-2',
+      approvalService: restarted,
+    );
+    expect(content(repeat), contains('PRIVATE_SENTINEL'));
+    expect(restarted.hasPending, isFalse);
+  });
 }

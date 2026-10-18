@@ -100,16 +100,7 @@ void main() {
       );
     }
   });
-  test('full access cannot auto approve clipboard or override read-only', () {
-    for (final action in [
-      PermissionAction.clipboardRead,
-      PermissionAction.clipboardWrite,
-    ]) {
-      expect(
-        policy.decide(mode: PermissionMode.fullAccess, action: action),
-        PermissionDecision.requestApproval,
-      );
-    }
+  test('allow rules cannot override read-only', () {
     expect(
       policy.decide(
         mode: PermissionMode.policyAuto,

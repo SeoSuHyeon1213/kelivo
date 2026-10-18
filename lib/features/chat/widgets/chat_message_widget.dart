@@ -5525,6 +5525,11 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   conversationId: approvalRequest.conversationId,
                 ),
               ),
+              ToolApprovalScopeButton(
+                approvalService: approvalService,
+                request: approvalRequest,
+                color: fg.accent,
+              ),
             ],
           )
         : isWorkspace
@@ -5814,6 +5819,11 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                             conversationId: pendingRequest.conversationId,
                           ),
                   ),
+                  ToolApprovalScopeButton(
+                    approvalService: approvalService,
+                    request: pendingRequest,
+                    color: fg.accent,
+                  ),
                 ] else if (isWorkspace)
                   WorkspaceToolStatusText(
                     part: workspacePart,
@@ -5940,6 +5950,11 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         conversationId: pendingRequest.conversationId,
                       ),
                     ),
+                  ),
+                  ToolApprovalScopeButton(
+                    approvalService: approvalService,
+                    request: pendingRequest,
+                    color: fg.accent,
                   ),
                 ],
               ),
