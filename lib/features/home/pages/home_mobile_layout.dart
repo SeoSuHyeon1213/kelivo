@@ -20,7 +20,78 @@ import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../chat/widgets/chat_assistant_background.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
+import '../../assistant/character_test_session.dart';
+import '../../assistant/widgets/character_test_memory_toggle.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+
+/// Floating pill shown while a character test chat is active; opens the
+/// assistant settings or ends the test session.
+class _CharacterTestBanner extends StatelessWidget {
+  const _CharacterTestBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = CharacterTestSession.instance;
+    return ValueListenableBuilder<String?>(
+      valueListenable: session.dockedAssistantId,
+      builder: (context, assistantId, _) {
+        final assistant = assistantId == null
+            ? null
+            : context.watch<AssistantProvider>().getById(assistantId);
+        if (assistant == null) return const SizedBox.shrink();
+        final l10n = AppLocalizations.of(context)!;
+        final cs = Theme.of(context).colorScheme;
+        return Center(
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            elevation: 2,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Lucide.MessageCircle, size: 16, color: cs.primary),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      l10n.assistantTestChatBanner(assistant.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.medium,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const CharacterTestMemoryToggle(),
+                  IconButton(
+                    tooltip: l10n.assistantEditPageTitle,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Lucide.Settings2, size: 18),
+                    onPressed: () => AssistantEntryActions.openAssistantSettings(
+                      context,
+                      assistant.id,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Lucide.X, size: 18),
+                    onPressed: session.close,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 /// Mobile layout scaffold for the home page
 /// This widget handles only the structural layout - AppBar, drawer, body structure
@@ -124,7 +195,17 @@ class HomeMobileScaffold extends StatelessWidget {
           extendBodyBehindAppBar: true,
           backgroundColor: Colors.transparent,
           appBar: appBarOverride ?? _buildAppBar(context, cs),
-          body: body,
+          body: Stack(
+            children: [
+              Positioned.fill(child: body),
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + kToolbarHeight + 6,
+                left: 12,
+                right: 12,
+                child: const _CharacterTestBanner(),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -24,7 +24,9 @@ import '../../chat/widgets/chat_gradient_background.dart';
 import '../../home/widgets/assistant_avatar.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../../core/models/assistant.dart';
+import '../character_test_session.dart';
 import '../widgets/assistant_reasoning_picker.dart';
+import '../widgets/character_test_memory_toggle.dart';
 import '../../chat/widgets/reasoning_level_sheet.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
@@ -367,6 +369,18 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
               : l10n.assistantEditPageTitle,
         ),
         actions: [
+          Tooltip(
+            message: l10n.assistantTestChatButton,
+            child: IosIconButton(
+              icon: Lucide.MessageCircle,
+              color: cs.onSurface,
+              size: 21,
+              minSize: 44,
+              semanticLabel: l10n.assistantTestChatButton,
+              onTap: () =>
+                  CharacterTestSession.instance.start(widget.assistantId),
+            ),
+          ),
           Tooltip(
             message: l10n.assistantEditTabLayoutTooltip,
             child: IosIconButton(
@@ -1682,9 +1696,37 @@ Future<void> showAssistantDesktopDialog(
   );
 }
 
-class _DesktopAssistantDialogShell extends StatefulWidget {
-  const _DesktopAssistantDialogShell({required this.assistantId});
+/// Assistant settings docked beside the main chat during a test session.
+class AssistantSettingsDockPanel extends StatelessWidget {
+  const AssistantSettingsDockPanel({
+    super.key,
+    required this.assistantId,
+    required this.onClose,
+  });
   final String assistantId;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return _DesktopAssistantDialogShell(
+      key: ValueKey(assistantId),
+      assistantId: assistantId,
+      docked: true,
+      onClose: onClose,
+    );
+  }
+}
+
+class _DesktopAssistantDialogShell extends StatefulWidget {
+  const _DesktopAssistantDialogShell({
+    super.key,
+    required this.assistantId,
+    this.docked = false,
+    this.onClose,
+  });
+  final String assistantId;
+  final bool docked;
+  final VoidCallback? onClose;
   @override
   State<_DesktopAssistantDialogShell> createState() =>
       _DesktopAssistantDialogShellState();
@@ -1694,12 +1736,33 @@ class _DesktopAssistantDialogShellState
     extends State<_DesktopAssistantDialogShell> {
   _AssistantDesktopMenu _menu = _AssistantDesktopMenu.basic;
 
+  void _startTestChat() {
+    Navigator.of(context).maybePop();
+    CharacterTestSession.instance.start(widget.assistantId);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final a = context.watch<AssistantProvider>().getById(widget.assistantId);
-    final name =
-        a?.name ?? AppLocalizations.of(context)!.assistantEditPageTitle;
+    final name = a?.name ?? l10n.assistantEditPageTitle;
+    final menu = _DesktopAssistantMenu(
+      selected: _menu,
+      onSelect: (m) => setState(() => _menu = m),
+      horizontal: widget.docked,
+    );
+    final divider = widget.docked
+        ? Divider(
+            height: 1,
+            thickness: 0.5,
+            color: cs.outlineVariant.withValues(alpha: 0.12),
+          )
+        : VerticalDivider(
+            width: 1,
+            thickness: 0.5,
+            color: cs.outlineVariant.withValues(alpha: 0.12),
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1720,11 +1783,20 @@ class _DesktopAssistantDialogShellState
                     ),
                   ),
                 ),
+                if (widget.docked)
+                  const CharacterTestMemoryToggle()
+                else
+                  TextButton.icon(
+                    onPressed: _startTestChat,
+                    icon: const Icon(Lucide.MessageCircle, size: 16),
+                    label: Text(l10n.assistantTestChatButton),
+                  ),
                 IconButton(
                   tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                   icon: const Icon(Lucide.X, size: 18),
                   color: cs.onSurface,
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed:
+                      widget.onClose ?? () => Navigator.of(context).maybePop(),
                 ),
               ],
             ),
@@ -1736,18 +1808,12 @@ class _DesktopAssistantDialogShellState
           color: cs.outlineVariant.withValues(alpha: 0.12),
         ),
         Expanded(
-          child: Row(
+          child: Flex(
+            direction: widget.docked ? Axis.vertical : Axis.horizontal,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _DesktopAssistantMenu(
-                selected: _menu,
-                onSelect: (m) => setState(() => _menu = m),
-              ),
-              VerticalDivider(
-                width: 1,
-                thickness: 0.5,
-                color: cs.outlineVariant.withValues(alpha: 0.12),
-              ),
+              menu,
+              divider,
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
@@ -1794,9 +1860,15 @@ class _DesktopAssistantDialogShellState
 }
 
 class _DesktopAssistantMenu extends StatefulWidget {
-  const _DesktopAssistantMenu({required this.selected, required this.onSelect});
+  const _DesktopAssistantMenu({
+    required this.selected,
+    required this.onSelect,
+    this.horizontal = false,
+  });
   final _AssistantDesktopMenu selected;
   final ValueChanged<_AssistantDesktopMenu> onSelect;
+  // Docked panels are too narrow for the 220px side menu.
+  final bool horizontal;
   @override
   State<_DesktopAssistantMenu> createState() => _DesktopAssistantMenuState();
 }
@@ -1820,11 +1892,13 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.regex, l10n.assistantEditPageRegexTab),
     ];
     return SizedBox(
-      width: 220,
+      width: widget.horizontal ? null : 220,
+      height: widget.horizontal ? 56 : null,
       child: ListView.separated(
-        padding: const EdgeInsets.all(12),
+        scrollDirection: widget.horizontal ? Axis.horizontal : Axis.vertical,
+        padding: EdgeInsets.all(widget.horizontal ? 8 : 12),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: 8, height: 8),
         itemBuilder: (ctx, i) {
           final selected = widget.selected == items[i].$1;
           final bg = selected

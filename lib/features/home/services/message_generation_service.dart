@@ -39,6 +39,7 @@ import 'context_usage_service.dart';
 import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
 import '../utils/model_display_helper.dart';
+import '../../assistant/character_test_session.dart';
 
 /// Callback types for UI updates from MessageGenerationService
 typedef OnMessagesChanged = void Function();
@@ -340,6 +341,10 @@ class MessageGenerationService {
       final assistants = contextProvider.read<AssistantProvider>();
       assistant = assistantId == null ? null : assistants.getById(assistantId);
     } catch (_) {}
+    assistant = CharacterTestSession.instance.applyMemoryOverride(
+      conversationId,
+      assistant,
+    );
     final conversation = chatService.getConversation(conversationId);
     final messages = await chatService.loadMessages(conversationId);
     final packed = await assembleUnprocessedRequestContext(

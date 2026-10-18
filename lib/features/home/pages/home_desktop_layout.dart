@@ -28,7 +28,55 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
+import '../../assistant/character_test_session.dart';
+import '../../assistant/pages/assistant_settings_edit_page.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+
+/// Assistant settings docked at the right edge while a character test chat is
+/// active (see [CharacterTestSession]).
+class _CharacterTestDock extends StatelessWidget {
+  const _CharacterTestDock();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = CharacterTestSession.instance;
+    return ValueListenableBuilder<String?>(
+      valueListenable: session.dockedAssistantId,
+      builder: (context, assistantId, _) {
+        final assistants = context.watch<AssistantProvider>();
+        if (assistantId == null || assistants.getById(assistantId) == null) {
+          return const SizedBox.shrink();
+        }
+        final cs = Theme.of(context).colorScheme;
+        final width = (MediaQuery.sizeOf(context).width * 0.36).clamp(
+          380.0,
+          560.0,
+        );
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            VerticalDivider(
+              width: 1,
+              thickness: 0.5,
+              color: cs.outlineVariant.withValues(alpha: 0.20),
+            ),
+            SizedBox(
+              width: width,
+              child: Material(
+                color: context.overlaySurface,
+                child: AssistantSettingsDockPanel(
+                  assistantId: assistantId,
+                  onClose: session.close,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
 
 /// Desktop/Tablet layout scaffold for the home page
 /// Handles the overall structure: left sidebar, main content, optional right sidebar
@@ -173,6 +221,7 @@ class HomeDesktopScaffold extends StatelessWidget {
             _buildWorkspaceBar(context, cs, workspaceBound: workspaceBound),
             // Right sidebar (desktop only with topics on right)
             _buildRightSidebar(context, cs, topicsOnRight),
+            const _CharacterTestDock(),
           ],
         ),
       ),

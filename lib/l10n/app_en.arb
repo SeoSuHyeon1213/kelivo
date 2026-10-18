@@ -355,6 +355,16 @@
   "homePageDropToUpload": "Drop files to upload",
   "assistantEditPageTitle": "Assistant",
   "assistantEditPageNotFound": "Assistant not found",
+  "assistantTestChatButton": "Test chat",
+  "assistantTestChatMemory": "Use memory in test chat",
+  "assistantTestChatBanner": "Testing: {name}",
+  "@assistantTestChatBanner": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "assistantEditPageBasicTab": "Basic",
   "assistantEditPagePromptsTab": "Prompts",
   "assistantEditPageMcpTab": "MCP",

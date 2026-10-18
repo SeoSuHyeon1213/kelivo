@@ -39,6 +39,7 @@ import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/world_book_popover.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../assistant/character_test_session.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/chat_tools_sheet.dart';
 import '../../chat/utils/ensure_conversation.dart';
@@ -715,6 +716,7 @@ class _HomePageState extends State<HomePage>
   bool _scrollNavHovering = false;
   double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
+  StreamSubscription<String>? _characterTestSub;
   IncomingShareService? _incomingShares;
   late final Future<void> _chatReady;
   bool _readingIncomingShares = false;
@@ -755,6 +757,9 @@ class _HomePageState extends State<HomePage>
     _chatReady = _controller.initChat();
     _initProcessText();
     _initIncomingShares();
+    _characterTestSub = CharacterTestSession.instance.requests.listen(
+      _startCharacterTest,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -764,6 +769,23 @@ class _HomePageState extends State<HomePage>
       if (!mounted) return;
       context.read<WorldBookProvider>().initialize();
     });
+  }
+
+  /// Opens a fresh conversation with [assistantId] in the main chat and docks
+  /// its settings beside it, so prompt edits can be tried immediately.
+  Future<void> _startCharacterTest(String assistantId) async {
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _chatReady;
+    if (!mounted) return;
+    await context.read<AssistantProvider>().setCurrentAssistant(assistantId);
+    if (!mounted) return;
+    await _controller.createNewConversationAnimated();
+    if (!mounted) return;
+    CharacterTestSession.instance.attach(
+      assistantId: assistantId,
+      conversationId: _controller.currentConversation?.id,
+    );
   }
 
   @override
@@ -810,6 +832,7 @@ class _HomePageState extends State<HomePage>
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
     _processTextSub?.cancel();
+    _characterTestSub?.cancel();
     _incomingShares?.dispose();
     _controller.removeListener(_onControllerChanged);
     _drawerController.removeListener(_onDrawerValueChanged);

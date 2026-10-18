@@ -29,6 +29,15 @@ Use every major model in one app, give it a workspace to get real work done, and
 
 </div>
 
+## 🍴 About This Fork
+
+This is a personal fork of [Chevey339/kelivo](https://github.com/Chevey339/kelivo), focused on AI role-play. `master` tracks upstream unchanged; fork changes live on feature branches. Changes compared to upstream:
+
+- **Character test chat**: a **Test chat** button in assistant settings opens a new conversation with that assistant in the main chat. On desktop the assistant settings stay docked beside the chat so prompt, world book and regex edits apply to the next reply; on mobile a floating bar opens the settings or ends the test. Test conversations are saved like any other chat.
+- **Memory toggle for test chats**: memory is off by default while testing (no memory injection, memory tools, auto-organize, past-chat recall or summaries for the test conversation), so trial runs do not pollute the assistant's long-term memory. Switch it on from the docked panel or the mobile bar.
+- **Update banner**: when upstream publishes a new version, the banner opens the upstream GitHub repository instead of downloading an upstream build.
+- **Tool approval scopes**: approve a tool call once, for the rest of the conversation, or always.
+
 ## 💡 Overview
 
 Kelivo is a cross-platform LLM client built with Flutter for Android, iOS, macOS, Windows and Linux. Connect your own API keys or sign in with a supported subscription, and switch between OpenAI, Gemini, Claude, DeepSeek, OpenRouter and any OpenAI-compatible service without switching apps.
@@ -124,6 +133,7 @@ The [User Guide](https://kelivo.psycheas.top/guide) (Chinese) covers providers, 
 - **Assistants**: each assistant has its own model, system prompt with template variables, preset messages, sampling parameters, context limit, custom request, tools, MCP servers, skills, default workspace, quick phrases, regex replacement rules, avatar and chat background. Organize assistants with tags.
 - **Long-term memory**: with auto-organize turned on, a background pipeline decides after each conversation what is worth remembering, then extracts, deduplicates and merges it into four types: identity, workflow, voice and instructions. Memories can be global or limited to one assistant. You can browse, edit and archive every memory, maintain a structured user profile, and inspect each background run step by step. Injected memories stay stable so prompt caching keeps working.
 - **World books**: entries triggered by keywords or regular expressions, injected at a configurable position, role and depth.
+- **Character test chat** (fork): try an assistant in a new chat with its settings docked beside it, with memory switched off unless you turn it on.
 - **Instruction injection**: reusable prompt cards, such as the built-in Learning Mode, applied before you send a message.
 - **Conversation tools**: context compression into a new chat, branches, response versions, temporary chats that are never saved, follow-up suggestions, and a per-chat model and system prompt. The descriptions of built-in tools can also be edited.
 

@@ -792,6 +792,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageNotFound => '助手不存在';
 
   @override
+  String get assistantTestChatButton => '测试聊天';
+
+  @override
+  String get assistantTestChatMemory => '测试聊天时使用记忆';
+
+  @override
+  String assistantTestChatBanner(String name) {
+    return '测试中：$name';
+  }
+
+  @override
   String get assistantEditPageBasicTab => '基础设置';
 
   @override
@@ -13086,6 +13097,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditPageNotFound => '助手不存在';
 
   @override
+  String get assistantTestChatButton => '测试聊天';
+
+  @override
+  String get assistantTestChatMemory => '测试聊天时使用记忆';
+
+  @override
+  String assistantTestChatBanner(String name) {
+    return '测试中：$name';
+  }
+
+  @override
   String get assistantEditPageBasicTab => '基础设置';
 
   @override
@@ -25304,6 +25326,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助理不存在';
+
+  @override
+  String get assistantTestChatButton => '測試聊天';
+
+  @override
+  String get assistantTestChatMemory => '測試聊天時使用記憶';
+
+  @override
+  String assistantTestChatBanner(String name) {
+    return '測試中：$name';
+  }
 
   @override
   String get assistantEditPageBasicTab => '基礎設定';

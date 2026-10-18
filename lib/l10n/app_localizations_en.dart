@@ -821,6 +821,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageNotFound => 'Assistant not found';
 
   @override
+  String get assistantTestChatButton => 'Test chat';
+
+  @override
+  String get assistantTestChatMemory => 'Use memory in test chat';
+
+  @override
+  String assistantTestChatBanner(String name) {
+    return 'Testing: $name';
+  }
+
+  @override
   String get assistantEditPageBasicTab => 'Basic';
 
   @override

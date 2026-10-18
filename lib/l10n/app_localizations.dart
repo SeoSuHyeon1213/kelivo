@@ -1582,6 +1582,24 @@ abstract class AppLocalizations {
   /// **'Assistant not found'**
   String get assistantEditPageNotFound;
 
+  /// No description provided for @assistantTestChatButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Test chat'**
+  String get assistantTestChatButton;
+
+  /// No description provided for @assistantTestChatMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Use memory in test chat'**
+  String get assistantTestChatMemory;
+
+  /// No description provided for @assistantTestChatBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing: {name}'**
+  String assistantTestChatBanner(String name);
+
   /// No description provided for @assistantEditPageBasicTab.
   ///
   /// In en, this message translates to:

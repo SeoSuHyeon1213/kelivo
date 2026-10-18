@@ -30,6 +30,7 @@ import '../services/context_usage_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
 import 'active_streaming_message_store.dart';
+import '../../assistant/character_test_session.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
@@ -1190,7 +1191,10 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantOverride ?? assistantProvider.currentAssistant;
+    final assistant = CharacterTestSession.instance.applyMemoryOverride(
+      conversation.id,
+      assistantOverride ?? assistantProvider.currentAssistant,
+    );
     final assistantId = assistant?.id;
     final modelConfig =
         modelOverride ??
@@ -1568,7 +1572,10 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantOverride ?? assistantProvider.currentAssistant;
+    final assistant = CharacterTestSession.instance.applyMemoryOverride(
+      conversation.id,
+      assistantOverride ?? assistantProvider.currentAssistant,
+    );
 
     await cancelStreaming(conversation);
 
@@ -1839,7 +1846,10 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantProvider.currentAssistant;
+    final assistant = CharacterTestSession.instance.applyMemoryOverride(
+      conversation.id,
+      assistantProvider.currentAssistant,
+    );
 
     final visibleIndex = _messages.indexWhere(
       (candidate) => candidate.id == message.id,

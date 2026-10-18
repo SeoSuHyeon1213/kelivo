@@ -26,6 +26,7 @@ import '../services/chat_suggestion_service.dart';
 import '../utils/model_display_helper.dart';
 import 'chat_actions.dart';
 import 'file_processing_indicator_controller.dart';
+import '../../assistant/character_test_session.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
@@ -327,6 +328,7 @@ class HomeViewModel extends ChangeNotifier {
     try {
       final settings = _contextProvider.read<SettingsProvider>();
       if (settings.legacyMemoryMode) return;
+      if (CharacterTestSession.instance.blocksMemory(conversationId)) return;
       final convo = _chatService.getConversation(conversationId);
       if (convo == null) return;
       final assistantProvider = _contextProvider.read<AssistantProvider>();
@@ -1639,6 +1641,7 @@ class HomeViewModel extends ChangeNotifier {
     if (convo == null) return;
     // Summaries only feed past-conversation search; temporary chats are never searchable.
     if (_chatService.isTemporaryConversation(convo.id)) return;
+    if (CharacterTestSession.instance.blocksMemory(convo.id)) return;
 
     final settings = _contextProvider.read<SettingsProvider>();
     if (!_chatService.isMessageCountKnown(conversationId)) return;

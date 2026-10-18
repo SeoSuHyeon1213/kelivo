@@ -7,6 +7,7 @@ import 'desktop_chat_page.dart';
 import 'window_title_bar.dart';
 import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
+import '../features/assistant/character_test_session.dart';
 import '../features/settings/pages/storage_space_page.dart';
 import '../l10n/app_localizations.dart';
 import 'package:window_manager/window_manager.dart';
@@ -40,6 +41,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   StreamSubscription<ChatAction>? _chatActionSub;
   StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
   StreamSubscription<String>? _conversationOpenSub;
+  StreamSubscription<String>? _characterTestSub;
 
   @override
   void initState() {
@@ -49,6 +51,14 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     }
     _storageVisited = _tabIndex == 2;
     _conversationOpenSub = NotificationService.conversationTaps.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _tabIndex = 0;
+        _globalSearchActive = false;
+      });
+      ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
+    });
+    _characterTestSub = CharacterTestSession.instance.requests.listen((_) {
       if (!mounted) return;
       setState(() {
         _tabIndex = 0;
@@ -294,6 +304,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   @override
   void dispose() {
     unawaited(_conversationOpenSub?.cancel());
+    unawaited(_characterTestSub?.cancel());
     try {
       _hotkeySub?.cancel();
     } catch (_) {}
