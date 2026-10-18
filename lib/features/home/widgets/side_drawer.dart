@@ -4010,8 +4010,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               final info = upd.available;
               if (upd.checking && info == null) return const SizedBox.shrink();
               if (info == null) return const SizedBox.shrink();
-              final url = info.bestDownloadUrl();
-              if (url == null || url.isEmpty) return const SizedBox.shrink();
+              const url = UpdateProvider.upstreamRepoUrl;
               final ver = info.version;
               final build = info.build;
               final l10n = AppLocalizations.of(context)!;

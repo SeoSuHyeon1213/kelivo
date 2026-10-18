@@ -75,6 +75,10 @@ class UpdateInfo {
 }
 
 class UpdateProvider extends ChangeNotifier {
+  // This fork does not ship upstream builds; the update banner links to the
+  // original repository instead of a platform download.
+  static const upstreamRepoUrl = 'https://github.com/Chevey339/kelivo';
+
   UpdateInfo? _available;
   UpdateInfo? get available => _available;
   bool _checking = false;
